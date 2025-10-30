@@ -1,0 +1,21 @@
+[package]
+name = "umf"
+version = "0.1.0"
+edition = "2021"
+authors = ["Simpaticoder Contributors"]
+description = "Universal Message Format (UMF) - Provider-agnostic message representation for LLM interactions"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/podtan/umf"
+homepage = "https://umf.podtan.com"
+documentation = "https://docs.rs/umf"
+keywords = ["llm", "message-format", "openai", "anthropic", "provider-agnostic"]
+categories = ["data-structures", "encoding"]
+rust-version = "1.70"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[dev-dependencies]
+# No additional dev dependencies needed for now
