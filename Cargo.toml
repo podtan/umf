@@ -1,6 +1,6 @@
 [package]
 name = "umf"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["Simpaticoder Contributors"]
 description = "Universal Message Format (UMF) - Provider-agnostic message representation for LLM interactions with ChatML formatting support"

@@ -34,7 +34,7 @@ use std::collections::HashMap;
 // ============================================================================
 
 pub mod chatml;
-pub use chatml::{ChatMLFormatter, ChatMLMessage};
+pub use chatml::{ChatMLFormatter, ChatMLMessage, MessageRole as ChatMLMessageRole};
 
 // ============================================================================
 // Core Message Types
