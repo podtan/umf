@@ -1,6 +1,6 @@
 [package]
 name = "umf"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 authors = ["Simpaticoder Contributors"]
 description = "Universal Message Format (UMF) - Provider-agnostic message representation for LLM interactions with ChatML formatting support"
@@ -20,6 +20,11 @@ rust-version = "1.70"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tiktoken-rs = "0.5"
+futures-util = { version = "0.3", optional = true }
+
+[features]
+default = []
+streaming = ["futures-util"]
 
 [dev-dependencies]
 # No additional dev dependencies needed for now

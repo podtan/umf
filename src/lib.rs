@@ -37,6 +37,15 @@ pub mod chatml;
 pub use chatml::{ChatMLFormatter, ChatMLMessage, MessageRole as ChatMLMessageRole};
 
 // ============================================================================
+// Streaming Support (optional feature)
+// ============================================================================
+
+#[cfg(feature = "streaming")]
+pub mod streaming;
+#[cfg(feature = "streaming")]
+pub use streaming::{StreamingAccumulator, StreamChunk, AccumulatedResponse};
+
+// ============================================================================
 // Core Message Types
 // ============================================================================
 
