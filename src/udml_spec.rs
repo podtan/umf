@@ -6,10 +6,10 @@
 #[cfg(feature = "udml")]
 use udml::prelude::*;
 
-/// The embedded UDML specification for UMF
+/// The embedded UDML specification for UMF (public for external components)
 pub const UDML_SPEC_YAML: &str = include_str!("../umf.udml.yaml");
 
-/// The embedded URP operations specification for UMF
+/// The embedded URP operations specification for UMF (public for external components)
 pub const URP_OPERATIONS_JSON: &str = include_str!("../urp_operations.json");
 
 /// UMF component ID as defined in UDML spec

@@ -38,7 +38,7 @@ use std::collections::HashMap;
 // ============================================================================
 
 pub mod udml_spec;
-pub use udml_spec::{UDML_SPEC_YAML, COMPONENT_ID, schema_ref};
+pub use udml_spec::{UDML_SPEC_YAML, URP_OPERATIONS_JSON, COMPONENT_ID, schema_ref};
 
 #[cfg(feature = "udml")]
 pub use udml_spec::load_specification;
