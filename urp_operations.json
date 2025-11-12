@@ -1,0 +1,306 @@
+{
+  "$schema": "https://udml.podtan.com/urp/v0.1/operations-schema.json",
+  "component": "umf",
+  "version": "0.2.0",
+  "operations": [
+    {
+      "id": "create-system-message",
+      "domain": "manipulation",
+      "type": "mutation",
+      "description": "Create a system message with instructions",
+      "input_schema": {
+        "type": "object",
+        "required": ["text"],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "System instructions text"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "const": "internal-message"
+          },
+          "data": {
+            "type": "object",
+            "description": "InternalMessage with role=system"
+          }
+        }
+      }
+    },
+    {
+      "id": "create-user-message",
+      "domain": "manipulation",
+      "type": "mutation",
+      "description": "Create a user message",
+      "input_schema": {
+        "type": "object",
+        "required": ["text"],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "User message text"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "const": "internal-message"
+          },
+          "data": {
+            "type": "object",
+            "description": "InternalMessage with role=user"
+          }
+        }
+      }
+    },
+    {
+      "id": "create-assistant-message",
+      "domain": "manipulation",
+      "type": "mutation",
+      "description": "Create an assistant message",
+      "input_schema": {
+        "type": "object",
+        "required": ["text"],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Assistant response text"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "const": "internal-message"
+          },
+          "data": {
+            "type": "object",
+            "description": "InternalMessage with role=assistant"
+          }
+        }
+      }
+    },
+    {
+      "id": "create-assistant-with-tools",
+      "domain": "manipulation",
+      "type": "mutation",
+      "description": "Create an assistant message with tool calls",
+      "input_schema": {
+        "type": "object",
+        "required": ["text", "tool_calls"],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Assistant message text"
+          },
+          "tool_calls": {
+            "type": "array",
+            "description": "Array of tool calls",
+            "items": {
+              "type": "object",
+              "required": ["id", "name", "input"],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique tool call ID"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Tool name"
+                },
+                "input": {
+                  "type": "object",
+                  "description": "Tool input parameters"
+                }
+              }
+            }
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "const": "internal-message"
+          },
+          "data": {
+            "type": "object",
+            "description": "InternalMessage with tool calls"
+          }
+        }
+      }
+    },
+    {
+      "id": "create-tool-result-message",
+      "domain": "manipulation",
+      "type": "mutation",
+      "description": "Create a tool result message",
+      "input_schema": {
+        "type": "object",
+        "required": ["tool_call_id", "name", "content"],
+        "properties": {
+          "tool_call_id": {
+            "type": "string",
+            "description": "ID of the tool call this result is for"
+          },
+          "name": {
+            "type": "string",
+            "description": "Tool name"
+          },
+          "content": {
+            "type": "string",
+            "description": "Tool result content"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "const": "internal-message"
+          },
+          "data": {
+            "type": "object",
+            "description": "InternalMessage with role=tool"
+          }
+        }
+      }
+    },
+    {
+      "id": "to-chatml",
+      "domain": "extract",
+      "type": "transform",
+      "description": "Convert InternalMessage to ChatML format",
+      "input_schema": {
+        "type": "object",
+        "required": ["message"],
+        "properties": {
+          "message": {
+            "type": "object",
+            "description": "InternalMessage to convert"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "const": "chatml-message"
+          },
+          "data": {
+            "type": "object",
+            "description": "ChatMLMessage format"
+          }
+        }
+      }
+    },
+    {
+      "id": "from-chatml",
+      "domain": "extract",
+      "type": "transform",
+      "description": "Convert ChatML format to InternalMessage",
+      "input_schema": {
+        "type": "object",
+        "required": ["chatml"],
+        "properties": {
+          "chatml": {
+            "type": "object",
+            "description": "ChatMLMessage to convert"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "const": "internal-message"
+          },
+          "data": {
+            "type": "object",
+            "description": "InternalMessage"
+          }
+        }
+      }
+    },
+    {
+      "id": "extract-text-content",
+      "domain": "extract",
+      "type": "transform",
+      "description": "Extract text content from a message",
+      "input_schema": {
+        "type": "object",
+        "required": ["message"],
+        "properties": {
+          "message": {
+            "type": "object",
+            "description": "InternalMessage to extract text from"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "const": "text-content"
+          },
+          "entity_type": {
+            "type": "string",
+            "const": "string"
+          },
+          "data": {
+            "type": "string",
+            "description": "Extracted text"
+          }
+        }
+      }
+    },
+    {
+      "id": "count-tokens",
+      "domain": "extract",
+      "type": "transform",
+      "description": "Count tokens in a ChatML message using tiktoken",
+      "input_schema": {
+        "type": "object",
+        "required": ["message"],
+        "properties": {
+          "message": {
+            "type": "object",
+            "description": "ChatMLMessage to count tokens for"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "const": "token-count"
+          },
+          "entity_type": {
+            "type": "string",
+            "const": "usize"
+          },
+          "data": {
+            "type": "number",
+            "description": "Token count"
+          }
+        }
+      }
+    }
+  ]
+}
