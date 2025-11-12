@@ -50,35 +50,7 @@ pub mod access_rules {
     pub const FORMAT_CONVERT: &str = "format-convert";
 }
 
-/// UDML manipulation operation IDs
-pub mod operations {
-    pub const CREATE_SYSTEM_MESSAGE: &str = "create-system-message";
-    pub const CREATE_USER_MESSAGE: &str = "create-user-message";
-    pub const CREATE_ASSISTANT_MESSAGE: &str = "create-assistant-message";
-    pub const CREATE_ASSISTANT_WITH_TOOLS: &str = "create-assistant-with-tools";
-    pub const CREATE_TOOL_RESULT_MESSAGE: &str = "create-tool-result-message";
-    pub const ADD_METADATA: &str = "add-metadata";
-    pub const ACCUMULATE_STREAM_CHUNK: &str = "accumulate-stream-chunk";
-}
 
-/// UDML transform IDs for data extraction
-pub mod transforms {
-    pub const TO_CHATML: &str = "to-chatml";
-    pub const FROM_CHATML: &str = "from-chatml";
-    pub const EXTRACT_TEXT_CONTENT: &str = "extract-text-content";
-    pub const COUNT_TOKENS: &str = "count-tokens";
-    pub const PARSE_SSE_CHUNK: &str = "parse-sse-chunk";
-    pub const ACCUMULATE_STREAMING_RESPONSE: &str = "accumulate-streaming-response";
-}
-
-/// UDML route IDs for message movement
-pub mod routes {
-    pub const TO_PROVIDER: &str = "to-provider";
-    pub const FROM_PROVIDER_STREAM: &str = "from-provider-stream";
-    pub const INTERNAL_MESSAGE_PASSING: &str = "internal-message-passing";
-    pub const SERIALIZE_TO_JSON: &str = "serialize-to-json";
-    pub const DESERIALIZE_FROM_JSON: &str = "deserialize-from-json";
-}
 
 /// UDML coordination primitive IDs
 pub mod coordination {
