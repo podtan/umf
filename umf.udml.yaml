@@ -1,0 +1,714 @@
+# UDML Specification for Universal Message Format (UMF)
+# This file defines the UDML structure for UMF v0.2.0 with UDML/URP support
+
+$schema: "https://udml.podtan.com/schema/v0.1"
+version: "0.1"
+id: umf
+layer: runtime
+ownership: crate
+summary: "Universal Message Format - Provider-agnostic message representation for LLM interactions with ChatML formatting support"
+purpose: "Provides standardized message structures and transformations for LLM communication across different providers"
+version_number: "0.2.0"
+author: "Simpaticoder Contributors"
+tags:
+  - llm
+  - message-format
+  - openai
+  - anthropic
+  - provider-agnostic
+  - chatml
+  - streaming
+
+repository: "https://github.com/podtan/umf"
+homepage: "https://umf.podtan.com"
+
+dependencies:
+  compile_time:
+    - serde
+    - serde_json
+    - tiktoken-rs
+    - futures-util
+  runtime:
+    - none
+
+provides:
+  # ============================================================================
+  # INFORMATION DOMAIN - Message Data Structures
+  # ============================================================================
+  information:
+    purpose: "Defines all message data structures and content types for LLM interactions"
+    entities:
+      - id: internal-message
+        kind: struct
+        purpose: "Core message representation with role, content, and metadata"
+        fields:
+          - role
+          - content
+          - metadata
+          - tool_call_id
+          - name
+        schema_ref: "umf#internal-message"
+        version: "1.0.0"
+        mutable: true
+        persistent: false
+        
+      - id: message-role
+        kind: enum
+        purpose: "Message role in conversation (system, user, assistant, tool)"
+        fields:
+          - system
+          - user
+          - assistant
+          - tool
+        schema_ref: "umf#message-role"
+        version: "1.0.0"
+        mutable: false
+        persistent: false
+        
+      - id: message-content
+        kind: enum
+        purpose: "Message content representation (text or structured blocks)"
+        fields:
+          - text
+          - blocks
+        schema_ref: "umf#message-content"
+        version: "1.0.0"
+        mutable: true
+        persistent: false
+        
+      - id: content-block
+        kind: enum
+        purpose: "Structured content block for multimodal messages (text, image, tool-use, tool-result)"
+        fields:
+          - text
+          - image
+          - tool-use
+          - tool-result
+        schema_ref: "umf#content-block"
+        version: "1.0.0"
+        mutable: false
+        persistent: false
+        
+      - id: tool-call
+        kind: struct
+        purpose: "Represents a tool/function call from LLM"
+        fields:
+          - id
+          - type
+          - function
+        schema_ref: "umf#tool-call"
+        version: "1.0.0"
+        mutable: false
+        persistent: false
+        
+      - id: function-call
+        kind: struct
+        purpose: "Function call details with name and arguments"
+        fields:
+          - name
+          - arguments
+        schema_ref: "umf#function-call"
+        version: "1.0.0"
+        mutable: false
+        persistent: false
+        
+      - id: chatml-message
+        kind: struct
+        purpose: "ChatML formatted message for provider communication"
+        fields:
+          - role
+          - content
+          - name
+          - tool_call_id
+          - tool_calls
+        schema_ref: "umf#chatml-message"
+        version: "1.0.0"
+        mutable: false
+        persistent: false
+        
+      - id: stream-chunk
+        kind: struct
+        purpose: "Individual chunk from streaming LLM response"
+        fields:
+          - delta
+          - finish_reason
+          - usage
+        schema_ref: "umf#stream-chunk"
+        version: "1.0.0"
+        mutable: false
+        persistent: false
+        
+      - id: accumulated-response
+        kind: struct
+        purpose: "Complete accumulated streaming response"
+        fields:
+          - content
+          - tool_calls
+          - finish_reason
+          - usage
+        schema_ref: "umf#accumulated-response"
+        version: "1.0.0"
+        mutable: true
+        persistent: false
+
+  # ============================================================================
+  # ACCESS DOMAIN - Message Access Rules
+  # ============================================================================
+  access:
+    purpose: "Defines access control and visibility rules for message operations"
+    rules:
+      - id: message-read
+        purpose: "Allow reading message content and metadata"
+        requires:
+          - valid-message-reference
+        constraints:
+          - message-exists
+        applicable_to:
+          - internal-message
+          - chatml-message
+          - stream-chunk
+        
+      - id: message-create
+        purpose: "Allow creating new messages with role and content"
+        requires:
+          - valid-role
+          - valid-content
+        constraints:
+          - role-is-valid-enum
+          - content-not-empty-for-text
+          - tool-messages-have-call-id
+        applicable_to:
+          - internal-message
+        
+      - id: stream-subscribe
+        purpose: "Allow subscribing to streaming message responses"
+        requires:
+          - streaming-feature-enabled
+        constraints:
+          - valid-stream-connection
+        applicable_to:
+          - stream-chunk
+          - accumulated-response
+        
+      - id: format-convert
+        purpose: "Allow converting between internal and provider formats"
+        requires:
+          - valid-source-format
+          - valid-target-format
+        constraints:
+          - format-compatibility
+        applicable_to:
+          - internal-message
+          - chatml-message
+
+  # ============================================================================
+  # MANIPULATION DOMAIN - Message Mutation Operations
+  # ============================================================================
+  manipulation:
+    purpose: "Defines lawful mutations for message creation and modification"
+    mutations:
+      - id: create-system-message
+        operation: create
+        kind: create
+        purpose: "Create a new system message"
+        inputs:
+          - text_content
+        outputs:
+          - internal_message
+        preconditions:
+          - text-not-empty
+        postconditions:
+          - role-is-system
+          - content-matches-input
+        validation:
+          - text-is-string
+        idempotent: false
+        
+      - id: create-user-message
+        operation: create
+        kind: create
+        purpose: "Create a new user message"
+        inputs:
+          - text_content
+        outputs:
+          - internal_message
+        preconditions:
+          - text-not-empty
+        postconditions:
+          - role-is-user
+          - content-matches-input
+        validation:
+          - text-is-string
+        idempotent: false
+        
+      - id: create-assistant-message
+        operation: create
+        kind: create
+        purpose: "Create a new assistant message"
+        inputs:
+          - text_content
+        outputs:
+          - internal_message
+        preconditions:
+          - text-not-empty
+        postconditions:
+          - role-is-assistant
+          - content-matches-input
+        validation:
+          - text-is-string
+        idempotent: false
+        
+      - id: create-assistant-with-tools
+        operation: create
+        kind: create
+        purpose: "Create assistant message with tool calls"
+        inputs:
+          - text_content
+          - tool_calls
+        outputs:
+          - internal_message
+        preconditions:
+          - text-not-empty
+          - tools-is-array
+          - tools-not-empty
+        postconditions:
+          - role-is-assistant
+          - content-has-text-and-tools
+        validation:
+          - each-tool-has-id-name-input
+        idempotent: false
+        
+      - id: create-tool-result-message
+        operation: create
+        kind: create
+        purpose: "Create tool result message"
+        inputs:
+          - tool_call_id
+          - tool_name
+          - result_content
+        outputs:
+          - internal_message
+        preconditions:
+          - tool-call-id-not-empty
+          - tool-name-not-empty
+        postconditions:
+          - role-is-tool
+          - has-tool-call-id
+          - has-tool-name
+        validation:
+          - tool-call-id-is-string
+          - content-is-valid-block
+        idempotent: false
+        
+      - id: add-metadata
+        operation: update
+        kind: update
+        purpose: "Add metadata key-value pair to message"
+        inputs:
+          - message
+          - key
+          - value
+        outputs:
+          - updated_message
+        preconditions:
+          - message-exists
+          - key-is-string
+          - value-is-string
+        postconditions:
+          - metadata-contains-key
+        validation:
+          - key-not-empty
+        idempotent: true
+        
+      - id: accumulate-stream-chunk
+        operation: update
+        kind: update
+        purpose: "Accumulate streaming chunk into response"
+        inputs:
+          - accumulator
+          - chunk
+        outputs:
+          - updated_accumulator
+        preconditions:
+          - accumulator-initialized
+          - chunk-valid
+        postconditions:
+          - content-appended
+          - usage-updated
+        validation:
+          - chunk-schema-valid
+        idempotent: false
+
+  # ============================================================================
+  # EXTRACT DOMAIN - Message Transformations
+  # ============================================================================
+  extract:
+    purpose: "Defines data transformations and derivations for message formats"
+    transforms:
+      - id: to-chatml
+        method: template
+        purpose: "Transform InternalMessage to ChatML format"
+        inputs:
+          - entity_id: internal-message
+            required: true
+        output:
+          entity_id: chatml-message
+          schema_ref: "umf#chatml-message"
+        deterministic: true
+        cacheable: false
+        algorithm: "Map role, flatten content, preserve tool calls and metadata"
+        
+      - id: from-chatml
+        method: template
+        purpose: "Transform ChatML message to InternalMessage"
+        inputs:
+          - entity_id: chatml-message
+            required: true
+        output:
+          entity_id: internal-message
+          schema_ref: "umf#internal-message"
+        deterministic: true
+        cacheable: false
+        algorithm: "Map role, parse content structure, extract metadata"
+        
+      - id: extract-text-content
+        method: projection
+        purpose: "Extract plain text from message content"
+        inputs:
+          - entity_id: internal-message
+            required: true
+        output:
+          entity_id: string
+          schema_ref: "rust#String"
+        deterministic: true
+        cacheable: true
+        algorithm: "Flatten content blocks to text, join with newlines"
+        
+      - id: count-tokens
+        method: algorithm
+        purpose: "Count tokens in message using tiktoken"
+        inputs:
+          - entity_id: chatml-message
+            required: true
+        output:
+          entity_id: token-count
+          schema_ref: "rust#usize"
+        deterministic: true
+        cacheable: true
+        algorithm: "cl100k_base tokenizer from tiktoken-rs"
+        
+      - id: parse-sse-chunk
+        method: algorithm
+        purpose: "Parse SSE (Server-Sent Events) streaming chunk"
+        inputs:
+          - entity_id: raw-sse-line
+            required: true
+        output:
+          entity_id: stream-chunk
+          schema_ref: "umf#stream-chunk"
+        deterministic: true
+        cacheable: false
+        algorithm: "Parse data: prefix, deserialize JSON, extract delta and finish_reason"
+        
+      - id: accumulate-streaming-response
+        method: aggregation
+        purpose: "Accumulate streaming chunks into complete response"
+        inputs:
+          - entity_id: stream-chunk
+            required: true
+            multiple: true
+        output:
+          entity_id: accumulated-response
+          schema_ref: "umf#accumulated-response"
+        deterministic: true
+        cacheable: false
+        algorithm: "Append text deltas, merge tool calls, track usage and finish reason"
+
+  # ============================================================================
+  # MOVEMENT DOMAIN - Message Routing and Streaming
+  # ============================================================================
+  movement:
+    purpose: "Defines how messages flow through the system and to LLM providers"
+    routes:
+      - id: to-provider
+        direction: out
+        medium: network
+        protocol: https
+        purpose: "Send formatted messages to LLM provider API"
+        reliability: at-least-once
+        async: true
+        trigger: request
+        retry_policy:
+          max_retries: 3
+          backoff: exponential
+          initial_delay_ms: 100
+        timeout_ms: 30000
+        format: json
+        
+      - id: from-provider-stream
+        direction: in
+        medium: network
+        protocol: sse
+        purpose: "Receive streaming response chunks from LLM provider"
+        reliability: at-least-once
+        async: true
+        trigger: event
+        retry_policy:
+          max_retries: 0
+          backoff: none
+        timeout_ms: 60000
+        format: sse-json
+        streaming: true
+        
+      - id: internal-message-passing
+        direction: bi
+        medium: memory
+        protocol: rust-ownership
+        purpose: "Pass messages between components in memory"
+        reliability: exactly-once
+        async: false
+        trigger: function-call
+        retry_policy:
+          max_retries: 0
+        timeout_ms: 0
+        format: native
+        
+      - id: serialize-to-json
+        direction: out
+        medium: memory
+        protocol: json
+        purpose: "Serialize message to JSON for storage or transmission"
+        reliability: exactly-once
+        async: false
+        trigger: request
+        retry_policy:
+          max_retries: 0
+        timeout_ms: 1000
+        format: json
+        
+      - id: deserialize-from-json
+        direction: in
+        medium: memory
+        protocol: json
+        purpose: "Deserialize message from JSON"
+        reliability: exactly-once
+        async: false
+        trigger: request
+        retry_policy:
+          max_retries: 0
+        timeout_ms: 1000
+        format: json
+
+  # ============================================================================
+  # COORDINATION DOMAIN - Message Processing Orchestration
+  # ============================================================================
+  coordination:
+    purpose: "Defines synchronization and orchestration patterns for message handling"
+    primitives:
+      - id: format-conversion-pipeline
+        kind: orchestration
+        purpose: "Coordinate transformation from internal format to provider format"
+        participants:
+          - internal-message-holder
+          - chatml-formatter
+          - json-serializer
+        steps:
+          - validate-internal-message
+          - transform-to-chatml
+          - serialize-to-json
+        dependencies:
+          - step: validate-internal-message
+            requires: []
+          - step: transform-to-chatml
+            requires:
+              - validate-internal-message
+          - step: serialize-to-json
+            requires:
+              - transform-to-chatml
+        failure_strategy: rollback
+        
+      - id: streaming-accumulation
+        kind: orchestration
+        purpose: "Coordinate accumulation of streaming chunks into complete response"
+        participants:
+          - stream-source
+          - accumulator
+          - chunk-parser
+        steps:
+          - initialize-accumulator
+          - receive-chunk
+          - parse-chunk
+          - accumulate-chunk
+          - check-finish-condition
+          - finalize-response
+        dependencies:
+          - step: initialize-accumulator
+            requires: []
+          - step: receive-chunk
+            requires:
+              - initialize-accumulator
+          - step: parse-chunk
+            requires:
+              - receive-chunk
+          - step: accumulate-chunk
+            requires:
+              - parse-chunk
+          - step: check-finish-condition
+            requires:
+              - accumulate-chunk
+          - step: finalize-response
+            requires:
+              - check-finish-condition
+        failure_strategy: retry-with-backoff
+        retry_policy:
+          max_retries: 3
+          backoff: exponential
+        
+      - id: message-validation-lock
+        kind: locking
+        purpose: "Ensure message validation is atomic"
+        participants:
+          - message-validator
+        lock_scope: message-instance
+        lock_duration_ms: 100
+        failure_strategy: fail-fast
+        
+      - id: token-counting-cache
+        kind: caching
+        purpose: "Cache token counts for identical messages"
+        participants:
+          - token-counter
+          - cache-store
+        cache_key_algorithm: "hash(chatml-message-content)"
+        cache_ttl_seconds: 3600
+        eviction_policy: lru
+        cache_size_limit: 10000
+
+# ============================================================================
+# INTEGRATION PATTERNS
+# ============================================================================
+integration:
+  patterns:
+    - name: llm-provider-adapter
+      description: "Adapt internal messages to specific LLM provider formats (OpenAI, Anthropic, etc.)"
+      components:
+        - umf-formatter
+        - provider-client
+      data_flow:
+        - internal-message → to-chatml → provider-specific-format → provider-api
+        
+    - name: streaming-consumer
+      description: "Consume streaming responses from LLM providers"
+      components:
+        - sse-parser
+        - stream-accumulator
+      data_flow:
+        - provider-stream → parse-sse → accumulate → accumulated-response
+        
+    - name: message-persistence
+      description: "Serialize messages for storage and deserialization"
+      components:
+        - json-serializer
+        - storage-backend
+      data_flow:
+        - internal-message → serialize-json → storage → deserialize-json → internal-message
+
+  external_interfaces:
+    - protocol: json-api
+      description: "JSON serialization for external consumption"
+      operations:
+        - serialize-message
+        - deserialize-message
+        
+    - protocol: rust-api
+      description: "Native Rust API for direct usage"
+      operations:
+        - create-messages
+        - convert-formats
+        - stream-processing
+
+# ============================================================================
+# EXAMPLES
+# ============================================================================
+examples:
+  - id: simple-user-message
+    title: "Create a simple user message"
+    description: "Demonstrates basic message creation"
+    code: |
+      use umf::InternalMessage;
+      let msg = InternalMessage::user("Hello, world!");
+      
+  - id: assistant-with-tools
+    title: "Create assistant message with tool calls"
+    description: "Shows how to create messages with tool invocations"
+    code: |
+      use umf::{InternalMessage, ContentBlock};
+      let msg = InternalMessage::assistant_with_tools(
+          "Let me search for that",
+          vec![ContentBlock::tool_use("call_123", "search", json!({"q": "rust"}))],
+      );
+      
+  - id: streaming-response
+    title: "Process streaming LLM response"
+    description: "Demonstrates streaming chunk accumulation"
+    code: |
+      use umf::streaming::StreamingAccumulator;
+      let mut acc = StreamingAccumulator::new();
+      for chunk in stream {
+          acc.accumulate_chunk(chunk)?;
+      }
+      let response = acc.finalize();
+
+# ============================================================================
+# METADATA
+# ============================================================================
+metadata:
+  language: rust
+  rust_version: "1.70"
+  license: "MIT OR Apache-2.0"
+  documentation_url: "https://docs.rs/umf"
+  keywords:
+    - llm
+    - message-format
+    - chatml
+    - streaming
+    - provider-agnostic
+  categories:
+    - data-structures
+    - encoding
+
+# ============================================================================
+# RISKS AND CONSIDERATIONS
+# ============================================================================
+risks:
+  - id: token-count-accuracy
+    category: functional
+    likelihood: low
+    impact: medium
+    status: accepted
+    description: "Token counting may not match provider's exact algorithm"
+    mitigation: "Use tiktoken-rs which approximates OpenAI's tokenizer"
+    
+  - id: streaming-connection-failure
+    category: reliability
+    likelihood: medium
+    impact: high
+    status: mitigated
+    description: "Streaming connections can fail mid-response"
+    mitigation: "Implement retry logic with exponential backoff and timeout handling"
+    
+  - id: message-size-limit
+    category: performance
+    likelihood: medium
+    impact: medium
+    status: accepted
+    description: "Very large messages may cause memory issues"
+    mitigation: "Document recommended message size limits and consider chunking"
+    
+  - id: format-compatibility
+    category: integration
+    likelihood: low
+    impact: high
+    status: mitigated
+    description: "Provider format changes could break transformations"
+    mitigation: "Version provider adapters and maintain compatibility tests"
