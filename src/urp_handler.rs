@@ -13,7 +13,8 @@
 use udml::prelude::*;
 
 #[cfg(feature = "udml")]
-use crate::{InternalMessage, ContentBlock, ChatMLMessage};
+use crate::{InternalMessage, ContentBlock};
+use crate::chatml::ChatMLMessage;
 #[cfg(feature = "udml")]
 use crate::udml_spec;
 #[cfg(feature = "udml")]

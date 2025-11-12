@@ -6,9 +6,8 @@
 mod accumulator;
 mod types;
 
-pub use accumulator::StreamingAccumulator;
-pub use types::StreamChunk;
-pub(crate) use types::AccumulatedResponse;
+pub(crate) use accumulator::StreamingAccumulator;
+pub(crate) use types::{StreamChunk, AccumulatedResponse};
 
 #[cfg(test)]
 mod tests;

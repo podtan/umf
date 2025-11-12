@@ -6,7 +6,7 @@
 //!
 //! ## UDML/URP Interface (v0.2.0+)
 //!
-//! **Recommended Usage**: Enable the `udml` feature and use the standard UDML interface:
+//! **UDML-Only Design**: All operations exposed through uniform URP interface:
 //!
 //! ```rust,ignore
 //! use umf::{UmfHandler, create_message_urp};
@@ -18,32 +18,17 @@
 //! let handler = UmfHandler::new();
 //! let response = handler.handle(urp)?;
 //!
-//! // Extract the message from the response
-//! let message: InternalMessage = serde_json::from_value(
-//!     response.information.data.expect("Should have data")
-//! )?;
+//! // Response contains the message as JSON in response.information.data
+//! // All message operations are done through URP - no direct struct access
 //! ```
 //!
 //! ## Core Principles
 //!
-//! 1. **UDML-First Design**: All operations exposed through uniform URP interface (v0.2.0+)
-//! 2. **OpenAI-Compatible Base**: The format follows OpenAI's JSON structure
+//! 1. **UDML-Only Design**: 100% URP interface, no direct struct access (v0.2.0+)
+//! 2. **OpenAI-Compatible Base**: Internal format follows OpenAI's JSON structure
 //! 3. **Provider-Agnostic**: Can be converted to any LLM provider format
-//! 4. **Metadata Support**: Includes optional metadata for internal tracking
-//! 5. **Tool Calling Support**: Full support for function/tool calling
-//!
-//! ## Legacy Usage (Deprecated)
-//!
-//! Direct struct access is deprecated when using the `udml` feature:
-//!
-//! ```rust,ignore
-//! // ⚠️ DEPRECATED: Direct usage without UDML
-//! use umf::{InternalMessage, MessageRole, ContentBlock};
-//!
-//! let msg = InternalMessage::user("Hello, world!");
-//! ```
-//!
-//! Use the URP interface instead for UDML compliance.
+//! 4. **Zero Direct Access**: All types (InternalMessage, ContentBlock, etc.) are private
+//! 5. **URP Operations Only**: See urp_operations.json and umf.udml.yaml for available operations
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -65,31 +50,28 @@ pub mod urp_handler;
 pub use urp_handler::{UmfHandler, create_message_urp};
 
 // ============================================================================
-// ChatML Support
+// ChatML Support (Internal)
 // ============================================================================
 
-pub mod chatml;
-pub use chatml::{ChatMLFormatter, ChatMLMessage, MessageRole as ChatMLMessageRole};
+pub(crate) mod chatml;
 
 // ============================================================================
-// Streaming Support (optional feature)
+// Streaming Support (Internal - optional feature)
 // ============================================================================
 
 #[cfg(feature = "streaming")]
-pub mod streaming;
-#[cfg(feature = "streaming")]
-pub use streaming::{StreamingAccumulator, StreamChunk};
+pub(crate) mod streaming;
 
 // ============================================================================
-// Core Message Types
+// Core Message Types (Internal - use URP interface)
 // ============================================================================
 
-/// A message in the internal format
+/// A message in the internal format (internal use only - use URP operations)
 ///
 /// This represents a single message in a conversation, with role, content,
 /// and optional metadata for provider-specific information.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InternalMessage {
+pub(crate) struct InternalMessage {
     /// Message role (system, user, assistant, tool)
     pub role: MessageRole,
     /// Message content (text or structured blocks)
@@ -106,8 +88,8 @@ pub struct InternalMessage {
 }
 
 impl InternalMessage {
-    /// Create a system message
-    pub fn system(text: impl Into<String>) -> Self {
+    /// Create a system message (internal)
+    pub(crate) fn system(text: impl Into<String>) -> Self {
         Self {
             role: MessageRole::System,
             content: MessageContent::Text(text.into()),
@@ -117,8 +99,8 @@ impl InternalMessage {
         }
     }
 
-    /// Create a user message
-    pub fn user(text: impl Into<String>) -> Self {
+    /// Create a user message (internal)
+    pub(crate) fn user(text: impl Into<String>) -> Self {
         Self {
             role: MessageRole::User,
             content: MessageContent::Text(text.into()),
@@ -128,8 +110,8 @@ impl InternalMessage {
         }
     }
 
-    /// Create an assistant message
-    pub fn assistant(text: impl Into<String>) -> Self {
+    /// Create an assistant message (internal)
+    pub(crate) fn assistant(text: impl Into<String>) -> Self {
         Self {
             role: MessageRole::Assistant,
             content: MessageContent::Text(text.into()),
@@ -139,8 +121,8 @@ impl InternalMessage {
         }
     }
 
-    /// Create a tool result message (legacy - use tool_result instead)
-    pub fn tool(content: MessageContent) -> Self {
+    /// Create a tool result message (legacy - use tool_result instead) (internal)
+    pub(crate) fn tool(content: MessageContent) -> Self {
         Self {
             role: MessageRole::Tool,
             content,
@@ -150,8 +132,8 @@ impl InternalMessage {
         }
     }
 
-    /// Create a properly structured tool result message
-    pub fn tool_result(
+    /// Create a properly structured tool result message (internal)
+    pub(crate) fn tool_result(
         tool_call_id: impl Into<String>,
         name: impl Into<String>,
         content: impl Into<String>,
@@ -165,8 +147,8 @@ impl InternalMessage {
         }
     }
 
-    /// Create an assistant message with tool calls
-    pub fn assistant_with_tools(content: impl Into<String>, tool_calls: Vec<ContentBlock>) -> Self {
+    /// Create an assistant message with tool calls (internal)
+    pub(crate) fn assistant_with_tools(content: impl Into<String>, tool_calls: Vec<ContentBlock>) -> Self {
         let mut blocks = vec![ContentBlock::text(content.into())];
         blocks.extend(tool_calls);
 
@@ -217,10 +199,10 @@ impl InternalMessage {
     }
 }
 
-/// Message role in a conversation
+/// Message role in a conversation (internal - use URP operations)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum MessageRole {
+pub(crate) enum MessageRole {
     /// System-level instructions
     System,
     /// User input
@@ -249,10 +231,10 @@ impl std::fmt::Display for MessageRole {
     }
 }
 
-/// Message content (text or structured blocks)
+/// Message content (text or structured blocks) (internal - use URP operations)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum MessageContent {
+pub(crate) enum MessageContent {
     /// Simple text content
     Text(String),
     /// Structured content blocks (for images, tool use, etc.)
@@ -285,10 +267,10 @@ impl MessageContent {
 // Content Block Types
 // ============================================================================
 
-/// Image source for image blocks
+/// Image source for image blocks (internal - use URP operations)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum ImageSource {
+pub(crate) enum ImageSource {
     /// Base64-encoded image data
     Base64 {
         /// MIME type of the image (e.g., "image/png")
@@ -303,13 +285,13 @@ pub enum ImageSource {
     },
 }
 
-/// A content block within a message
+/// A content block within a message (internal - use URP operations)
 ///
 /// This follows the Universal Message Format specification exactly.
 /// Each variant serializes to JSON with a "type" field and flattened fields.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum ContentBlock {
+pub(crate) enum ContentBlock {
     /// Text content
     Text {
         /// The text content

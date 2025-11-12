@@ -21,14 +21,14 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tiktoken-rs = "0.5"
 futures-util = { version = "0.3", optional = true }
-# UDML support for runtime URP handling
-udml = { version = "0.1.0", optional = true }
+# UDML support for runtime URP handling (using local path for development)
+udml = { path = "../udml", optional = true }
 chrono = { version = "0.4", optional = true }
 ulid = { version = "1.0", optional = true }
 
 [build-dependencies]
-# UDML for compile-time specification validation
-udml = "0.1.0"
+# UDML for compile-time specification validation (using local path for development)
+udml = { path = "../udml" }
 serde_json = "1.0"
 
 [features]
