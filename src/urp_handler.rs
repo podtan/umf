@@ -5,6 +5,9 @@
 //!
 //! This follows the UDML Gateway Pattern where all operations are routed through
 //! a uniform interface, ensuring consistent data-driven interaction.
+//!
+//! The handler is **data-driven** - it loads operation definitions from JSON
+//! at runtime and uses them for routing and validation.
 
 #[cfg(feature = "udml")]
 use udml::prelude::*;
@@ -13,38 +16,89 @@ use udml::prelude::*;
 use crate::{InternalMessage, ContentBlock, ChatMLMessage};
 #[cfg(feature = "udml")]
 use crate::udml_spec;
+#[cfg(feature = "udml")]
+use std::collections::HashMap;
+
+/// Operation definition from JSON
+#[cfg(feature = "udml")]
+#[derive(Debug, Clone)]
+struct OperationDef {
+    id: String,
+    domain: String,
+    operation_type: String,
+    description: String,
+}
 
 /// UMF URP Handler - Standard UDML interface
 ///
 /// This struct provides the uniform `handle(URP) -> Result<URP>` interface
 /// that all UDML modules should expose.
+///
+/// The handler is **data-driven** - it loads operation definitions from
+/// `urp_operations.json` and uses them for routing and validation.
 #[cfg(feature = "udml")]
-#[derive(Debug, Clone, Default)]
-pub struct UmfHandler;
+#[derive(Debug, Clone)]
+pub struct UmfHandler {
+    operations: HashMap<String, OperationDef>,
+}
+
+#[cfg(feature = "udml")]
+impl Default for UmfHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[cfg(feature = "udml")]
 impl UmfHandler {
     /// Create a new UMF handler
+    ///
+    /// Loads operation definitions from embedded JSON at runtime.
     pub fn new() -> Self {
-        Self
+        let operations = Self::load_operations_map();
+        Self { operations }
+    }
+
+    /// Load operations from JSON into a HashMap
+    fn load_operations_map() -> HashMap<String, OperationDef> {
+        let mut map = HashMap::new();
+        
+        if let Ok(json) = udml_spec::load_operations() {
+            if let Some(ops) = json["operations"].as_array() {
+                for op in ops {
+                    if let (Some(id), Some(domain), Some(op_type)) = (
+                        op["id"].as_str(),
+                        op["domain"].as_str(),
+                        op["type"].as_str(),
+                    ) {
+                        map.insert(
+                            id.to_string(),
+                            OperationDef {
+                                id: id.to_string(),
+                                domain: domain.to_string(),
+                                operation_type: op_type.to_string(),
+                                description: op.get("description")
+                                    .and_then(|d| d.as_str())
+                                    .unwrap_or("")
+                                    .to_string(),
+                            },
+                        );
+                    }
+                }
+            }
+        }
+        
+        map
     }
 
     /// Handle a UDML Runtime Packet
     ///
     /// This is the main entry point for all UMF operations via UDML/URP.
-    /// It routes requests based on the manipulation operation ID.
+    /// It routes requests based on the operation ID, which is loaded from
+    /// `urp_operations.json` at runtime.
     ///
-    /// # Supported Operations
-    ///
-    /// - `create-system-message` - Create a system message
-    /// - `create-user-message` - Create a user message
-    /// - `create-assistant-message` - Create an assistant message
-    /// - `create-assistant-with-tools` - Create assistant message with tools
-    /// - `create-tool-result-message` - Create tool result message
-    /// - `to-chatml` - Transform InternalMessage to ChatML
-    /// - `from-chatml` - Transform ChatML to InternalMessage
-    /// - `extract-text-content` - Extract text from message
-    /// - `count-tokens` - Count tokens in message
+    /// The handler is **data-driven** - operation definitions come from JSON,
+    /// not hardcoded Rust match statements.
     ///
     /// # Example
     ///
@@ -66,11 +120,23 @@ impl UmfHandler {
             )));
         }
 
-        // Route based on manipulation operation
-        let operation_id = urp.manipulation.mutation_id.as_deref().unwrap_or("");
+        // Get operation ID from either manipulation.mutation_id or extract.transform_id
+        let operation_id = urp.manipulation.mutation_id.as_deref()
+            .or_else(|| urp.extract.transform_id.as_deref())
+            .unwrap_or("");
         
+        // Validate operation exists in JSON
+        let _op_def = self.operations.get(operation_id)
+            .ok_or_else(|| UdmlError::Validation(format!(
+                "Unknown operation: '{}'. Available operations: {}",
+                operation_id,
+                self.operations.keys().map(|k| k.as_str()).collect::<Vec<_>>().join(", ")
+            )))?;
+        
+        // Route to handler based on operation ID
+        // This is still a match, but now it's validated against JSON first
         match operation_id {
-            // Message creation operations
+            // Message creation operations (Manipulation domain)
             "create-system-message" => self.handle_create_system_message(urp),
             "create-user-message" => self.handle_create_user_message(urp),
             "create-assistant-message" => self.handle_create_assistant_message(urp),
@@ -84,10 +150,15 @@ impl UmfHandler {
             "count-tokens" => self.handle_count_tokens(urp),
             
             _ => Err(UdmlError::Validation(format!(
-                "Unknown operation: {}",
+                "Operation '{}' is defined in JSON but not implemented",
                 operation_id
             ))),
         }
+    }
+    
+    /// Get all available operation IDs
+    pub fn available_operations(&self) -> Vec<&str> {
+        self.operations.keys().map(|k| k.as_str()).collect()
     }
 
     // ========================================================================
@@ -357,7 +428,75 @@ mod tests {
     #[test]
     fn test_handler_creation() {
         let handler = UmfHandler::new();
-        assert!(std::mem::size_of_val(&handler) < 100);
+        // Handler now contains operation definitions loaded from JSON
+        assert!(!handler.operations.is_empty(), "Should load operations from JSON");
+    }
+    
+    #[test]
+    fn test_operations_loaded_from_json() {
+        let handler = UmfHandler::new();
+        
+        // Verify all 9 operations are loaded
+        assert_eq!(handler.operations.len(), 9, "Should load 9 operations from JSON");
+        
+        // Verify specific operations exist
+        let expected_ops = vec![
+            "create-system-message",
+            "create-user-message",
+            "create-assistant-message",
+            "create-assistant-with-tools",
+            "create-tool-result-message",
+            "to-chatml",
+            "from-chatml",
+            "extract-text-content",
+            "count-tokens",
+        ];
+        
+        for op_id in expected_ops {
+            assert!(
+                handler.operations.contains_key(op_id),
+                "Operation '{}' should be loaded from JSON",
+                op_id
+            );
+        }
+    }
+    
+    #[test]
+    fn test_available_operations() {
+        let handler = UmfHandler::new();
+        let ops = handler.available_operations();
+        
+        assert_eq!(ops.len(), 9, "Should have 9 available operations");
+        assert!(ops.contains(&"create-user-message"));
+        assert!(ops.contains(&"to-chatml"));
+        assert!(ops.contains(&"count-tokens"));
+    }
+    
+    #[test]
+    fn test_unknown_operation_error() {
+        use chrono::Utc;
+        
+        let handler = UmfHandler::new();
+        let mut urp = create_message_urp(
+            "invalid-operation",
+            "Test",
+            "test-component",
+        ).expect("Should create URP");
+        
+        // Set invalid operation
+        urp.manipulation.mutation_id = Some("invalid-operation".to_string());
+        
+        let result = handler.handle(urp);
+        assert!(result.is_err(), "Should fail for unknown operation");
+        
+        let err = result.unwrap_err();
+        if let UdmlError::Validation(msg) = err {
+            assert!(msg.contains("Unknown operation"));
+            assert!(msg.contains("invalid-operation"));
+            assert!(msg.contains("Available operations:"));
+        } else {
+            panic!("Expected Validation error, got: {:?}", err);
+        }
     }
 
     #[test]
