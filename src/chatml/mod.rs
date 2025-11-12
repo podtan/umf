@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use tiktoken_rs::cl100k_base;
+use crate::InternalMessage;
 
 /// ChatML message roles.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -134,6 +135,147 @@ impl ChatMLMessage {
             "<|im_start|>{}{}\n{}\n<|im_end|>",
             self.role, name_part, self.content
         )
+    }
+
+    /// Create ChatML message from InternalMessage
+    ///
+    /// Converts an InternalMessage to ChatML format, handling content blocks.
+    pub fn from_internal(msg: &InternalMessage) -> Self {
+        let role = match &msg.role {
+            crate::MessageRole::System => MessageRole::System,
+            crate::MessageRole::User => MessageRole::User,
+            crate::MessageRole::Assistant => MessageRole::Assistant,
+            crate::MessageRole::Tool => MessageRole::Tool,
+        };
+        
+        // Handle tool messages specially
+        if msg.role == crate::MessageRole::Tool {
+            let content = match &msg.content {
+                crate::MessageContent::Text(text) => text.clone(),
+                crate::MessageContent::Blocks(blocks) => {
+                    // Extract text from blocks
+                    blocks
+                        .iter()
+                        .filter_map(|b| match b {
+                            crate::ContentBlock::Text { text } => Some(text.as_str()),
+                            _ => None,
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                }
+            };
+            
+            return ChatMLMessage {
+                role,
+                content,
+                name: msg.name.clone(),
+                tool_call_id: msg.tool_call_id.clone(),
+                tool_calls: None,
+            };
+        }
+        
+        // Extract text content and tool calls from content blocks
+        let (content, tool_calls) = match &msg.content {
+            crate::MessageContent::Text(text) => (text.clone(), None),
+            crate::MessageContent::Blocks(blocks) => {
+                let mut text_parts = Vec::new();
+                let mut tool_calls_vec = Vec::new();
+                
+                for block in blocks {
+                    match block {
+                        crate::ContentBlock::Text { text } => text_parts.push(text.clone()),
+                        crate::ContentBlock::ToolUse { id, name, input } => {
+                            tool_calls_vec.push(crate::ToolCall {
+                                id: id.clone(),
+                                r#type: "function".to_string(),
+                                function: crate::FunctionCall {
+                                    name: name.clone(),
+                                    arguments: serde_json::to_string(input).unwrap_or_default(),
+                                },
+                            });
+                        }
+                        _ => {} // Skip other block types
+                    }
+                }
+                
+                let content = text_parts.join("\n");
+                let tool_calls = if tool_calls_vec.is_empty() {
+                    None
+                } else {
+                    Some(tool_calls_vec)
+                };
+                
+                (content, tool_calls)
+            }
+        };
+        
+        ChatMLMessage {
+            role,
+            content,
+            name: msg.name.clone(),
+            tool_call_id: msg.tool_call_id.clone(),
+            tool_calls,
+        }
+    }
+
+    /// Convert ChatML message to InternalMessage
+    ///
+    /// Note: This converts only basic message types. Tool calls and tool results
+    /// are handled separately through ContentBlock variants.
+    pub fn to_internal(&self) -> InternalMessage {
+        let role = match &self.role {
+            MessageRole::System => crate::MessageRole::System,
+            MessageRole::User => crate::MessageRole::User,
+            MessageRole::Assistant => crate::MessageRole::Assistant,
+            MessageRole::Tool => crate::MessageRole::Tool,
+        };
+        
+        // If this is a tool result, create it as a proper tool message
+        if let Some(tool_call_id) = &self.tool_call_id {
+            return InternalMessage {
+                role: crate::MessageRole::Tool,
+                content: crate::MessageContent::Text(self.content.clone()),
+                metadata: std::collections::HashMap::new(),
+                tool_call_id: Some(tool_call_id.clone()),
+                name: self.name.clone(),
+            };
+        }
+        
+        // If this is an assistant message with tool calls, convert them
+        if let Some(tool_calls) = &self.tool_calls {
+            let mut blocks = vec![];
+            if !self.content.is_empty() {
+                blocks.push(crate::ContentBlock::Text {
+                    text: self.content.clone(),
+                });
+            }
+            for tool_call in tool_calls {
+                // Parse arguments string to JSON
+                let input = serde_json::from_str(&tool_call.function.arguments)
+                    .unwrap_or(serde_json::Value::Null);
+                blocks.push(crate::ContentBlock::ToolUse {
+                    id: tool_call.id.clone(),
+                    name: tool_call.function.name.clone(),
+                    input,
+                });
+            }
+            return InternalMessage {
+                role,
+                content: crate::MessageContent::Blocks(blocks),
+                metadata: std::collections::HashMap::new(),
+                tool_call_id: None,
+                name: None,
+            };
+        }
+        
+        // Otherwise, it's a simple text message
+        InternalMessage {
+            role,
+            content: crate::MessageContent::Text(self.content.clone()),
+            metadata: std::collections::HashMap::new(),
+            tool_call_id: None,
+            name: None,
+        }
     }
 }
 

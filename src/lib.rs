@@ -39,6 +39,12 @@ pub use udml_spec::{UDML_SPEC_YAML, COMPONENT_ID, schema_ref};
 #[cfg(feature = "udml")]
 pub use udml_spec::load_specification;
 
+#[cfg(feature = "udml")]
+pub mod urp_handler;
+
+#[cfg(feature = "udml")]
+pub use urp_handler::{UmfHandler, create_message_urp};
+
 // ============================================================================
 // ChatML Support
 // ============================================================================
@@ -167,6 +173,27 @@ impl InternalMessage {
         match &self.content {
             MessageContent::Blocks(blocks) => Some(blocks),
             _ => None,
+        }
+    }
+
+    /// Extract all text content from the message
+    ///
+    /// For text messages, returns the text directly.
+    /// For block messages, extracts and concatenates text from all text blocks.
+    pub fn to_text(&self) -> String {
+        match &self.content {
+            MessageContent::Text(text) => text.clone(),
+            MessageContent::Blocks(blocks) => {
+                blocks
+                    .iter()
+                    .filter_map(|block| match block {
+                        ContentBlock::Text { text } => Some(text.as_str()),
+                        ContentBlock::ToolResult { content, .. } => Some(content.as_str()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            }
         }
     }
 }

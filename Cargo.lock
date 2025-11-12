@@ -621,13 +621,15 @@ dependencies = [
 
 [[package]]
 name = "umf"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
+ "chrono",
  "futures-util",
  "serde",
  "serde_json",
  "tiktoken-rs",
  "udml",
+ "ulid",
 ]
 
 [[package]]

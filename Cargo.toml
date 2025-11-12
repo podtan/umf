@@ -23,6 +23,8 @@ tiktoken-rs = "0.5"
 futures-util = { version = "0.3", optional = true }
 # UDML support for runtime URP handling
 udml = { version = "0.1.0", optional = true }
+chrono = { version = "0.4", optional = true }
+ulid = { version = "1.0", optional = true }
 
 [build-dependencies]
 # UDML for compile-time specification validation
@@ -32,7 +34,7 @@ udml = "0.1.0"
 default = []
 streaming = ["futures-util"]
 # Enable UDML/URP support for standardized message handling
-udml = ["dep:udml"]
+udml = ["dep:udml", "dep:chrono", "dep:ulid"]
 
 [dev-dependencies]
 # No additional dev dependencies needed for now
