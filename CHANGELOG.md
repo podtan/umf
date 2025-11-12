@@ -35,12 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bumped `udml` dependency to `0.1.0` (build and optional runtime)
 - Enhanced module organization with `udml_spec` and `urp_handler` modules
 
-### Deprecated
-- **Direct struct access deprecated** when `udml` feature is enabled:
-  - `ToolCall`, `FunctionCall`, `Function`, `Tool`, `GenerateResult` types
-  - These types are now internal implementation details
-  - **Migration**: Use `UmfHandler::handle(urp)` with appropriate URP operations instead
-  - Direct access remains available for backward compatibility but will be removed in v0.3.0
+### Removed
+- **BREAKING**: Made internal types private - no longer part of public API:
+  - `ToolCall`, `FunctionCall`, `Function`, `Tool` - now `pub(crate)`
+  - `GenerateResult` - removed entirely (use URP operations)
+  - `AccumulatedResponse` - now `pub(crate)` (internal streaming type)
+  - **Migration**: All external code must use `UmfHandler::handle(urp)` interface
+  - These types are implementation details for ChatML formatting and streaming
 
 ### Documentation
 - Added comprehensive UDML specification documenting all message operations

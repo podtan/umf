@@ -19,11 +19,13 @@ pub enum StreamChunk {
     Done,
 }
 
-/// Accumulated response from streaming
+/// Accumulated response from streaming (internal)
+///
+/// This is internal to UMF. External code should use the UDML/URP interface.
 #[derive(Debug, Clone)]
-pub struct AccumulatedResponse {
+pub(crate) struct AccumulatedResponse {
     /// Accumulated text content
     pub text: String,
     /// Accumulated tool calls (in index order)
-    pub tool_calls: Vec<crate::ToolCall>,
+    pub(crate) tool_calls: Vec<crate::ToolCall>,
 }

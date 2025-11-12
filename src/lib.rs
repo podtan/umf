@@ -78,7 +78,7 @@ pub use chatml::{ChatMLFormatter, ChatMLMessage, MessageRole as ChatMLMessageRol
 #[cfg(feature = "streaming")]
 pub mod streaming;
 #[cfg(feature = "streaming")]
-pub use streaming::{StreamingAccumulator, StreamChunk, AccumulatedResponse};
+pub use streaming::{StreamingAccumulator, StreamChunk};
 
 // ============================================================================
 // Core Message Types
@@ -400,90 +400,44 @@ impl ContentBlock {
 }
 
 // ============================================================================
-// OpenAI-Compatible Tool Types
+// OpenAI-Compatible Tool Types (Internal)
 // ============================================================================
 //
-// NOTE: These types are internal and should only be accessed through the UDML/URP
-// interface when the `udml` feature is enabled. Direct usage is deprecated and will
-// be removed in a future version.
+// These types are internal to UMF and used for ChatML formatting and streaming.
+// External access should go through the UDML/URP interface.
 //
-// For new code, use `UmfHandler::handle(urp)` with appropriate URP operations.
-//
-// These types remain public for backward compatibility but are not part of the
-// stable API when using UDML.
+// They are kept as pub(crate) for internal modules but not exposed in the public API.
 
-/// Function call structure for tool invocations
-/// 
-/// **DEPRECATED**: Use UDML/URP interface instead when `udml` feature is enabled.
-/// Access through `UmfHandler::handle(urp)` operations.
+/// Function call structure for tool invocations (internal)
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[cfg_attr(feature = "udml", deprecated(
-    since = "0.2.0",
-    note = "Use UDML/URP interface through UmfHandler::handle(urp) instead"
-))]
-pub struct FunctionCall {
+pub(crate) struct FunctionCall {
     pub name: String,
     pub arguments: String,
 }
 
-/// Tool call structure for function calling
-///
-/// **DEPRECATED**: Use UDML/URP interface instead when `udml` feature is enabled.
-/// Access through `UmfHandler::handle(urp)` operations.
+/// Tool call structure for function calling (internal)
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[cfg_attr(feature = "udml", deprecated(
-    since = "0.2.0",
-    note = "Use UDML/URP interface through UmfHandler::handle(urp) instead"
-))]
-pub struct ToolCall {
+pub(crate) struct ToolCall {
     pub id: String,
     #[serde(rename = "type")]
     pub r#type: String,
     pub function: FunctionCall,
 }
 
-/// Function definition for tools
-///
-/// **DEPRECATED**: Use UDML/URP interface instead when `udml` feature is enabled.
-/// Access through `UmfHandler::handle(urp)` operations.
+/// Function definition for tools (internal)
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[cfg_attr(feature = "udml", deprecated(
-    since = "0.2.0",
-    note = "Use UDML/URP interface through UmfHandler::handle(urp) instead"
-))]
-pub struct Function {
+pub(crate) struct Function {
     pub name: String,
     pub description: String,
     pub parameters: serde_json::Value,
 }
 
-/// Tool definition for OpenAI-compatible tools
-///
-/// **DEPRECATED**: Use UDML/URP interface instead when `udml` feature is enabled.
-/// Access through `UmfHandler::handle(urp)` operations.
+/// Tool definition for OpenAI-compatible tools (internal)
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[cfg_attr(feature = "udml", deprecated(
-    since = "0.2.0",
-    note = "Use UDML/URP interface through UmfHandler::handle(urp) instead"
-))]
-pub struct Tool {
+pub(crate) struct Tool {
     #[serde(rename = "type")]
     pub r#type: String,
     pub function: Function,
-}
-
-/// Result of generation with tools
-///
-/// **DEPRECATED**: Use UDML/URP interface instead when `udml` feature is enabled.
-/// Access through `UmfHandler::handle(urp)` operations.
-#[derive(Debug)]
-#[cfg_attr(feature = "udml", deprecated(
-    since = "0.2.0",
-    note = "Use UDML/URP interface through UmfHandler::handle(urp) instead"
-))]
-pub enum GenerateResult {
-    Content(String),
-    ToolCalls(Vec<ToolCall>),
 }
 
 // ============================================================================

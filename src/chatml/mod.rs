@@ -331,7 +331,7 @@ impl ChatMLFormatter {
     /// # Arguments
     /// * `content` - Assistant message content (can be empty for tool-only responses).
     /// * `tool_calls` - Vector of tool calls made by the assistant.
-    pub fn add_assistant_message_with_tool_calls(
+    pub(crate) fn add_assistant_message_with_tool_calls(
         &mut self,
         content: String,
         tool_calls: Vec<crate::ToolCall>,
