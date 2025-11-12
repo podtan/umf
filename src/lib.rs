@@ -4,27 +4,46 @@
 //! It follows the OpenAI-compatible JSON structure as the foundation while supporting
 //! conversion to any LLM provider format (Anthropic, Google Gemini, Cohere, etc.).
 //!
+//! ## UDML/URP Interface (v0.2.0+)
+//!
+//! **Recommended Usage**: Enable the `udml` feature and use the standard UDML interface:
+//!
+//! ```rust,ignore
+//! use umf::{UmfHandler, create_message_urp};
+//!
+//! // Create a URP request for a user message
+//! let urp = create_message_urp("create-user-message", "Hello, world!", "my-component")?;
+//!
+//! // Handle the request through UDML interface
+//! let handler = UmfHandler::new();
+//! let response = handler.handle(urp)?;
+//!
+//! // Extract the message from the response
+//! let message: InternalMessage = serde_json::from_value(
+//!     response.information.data.expect("Should have data")
+//! )?;
+//! ```
+//!
 //! ## Core Principles
 //!
-//! 1. **OpenAI-Compatible Base**: The format follows OpenAI's JSON structure
-//! 2. **Provider-Agnostic**: Can be converted to any LLM provider format
-//! 3. **Metadata Support**: Includes optional metadata for internal tracking
-//! 4. **Tool Calling Support**: Full support for function/tool calling
+//! 1. **UDML-First Design**: All operations exposed through uniform URP interface (v0.2.0+)
+//! 2. **OpenAI-Compatible Base**: The format follows OpenAI's JSON structure
+//! 3. **Provider-Agnostic**: Can be converted to any LLM provider format
+//! 4. **Metadata Support**: Includes optional metadata for internal tracking
+//! 5. **Tool Calling Support**: Full support for function/tool calling
 //!
-//! ## Usage
+//! ## Legacy Usage (Deprecated)
 //!
-//! ```rust
+//! Direct struct access is deprecated when using the `udml` feature:
+//!
+//! ```rust,ignore
+//! // ⚠️ DEPRECATED: Direct usage without UDML
 //! use umf::{InternalMessage, MessageRole, ContentBlock};
 //!
-//! // Create a simple text message
 //! let msg = InternalMessage::user("Hello, world!");
-//!
-//! // Create a message with tool calls
-//! let msg = InternalMessage::assistant_with_tools(
-//!     "Let me search for that",
-//!     vec![ContentBlock::tool_use("call_123", "search", serde_json::json!({"q": "rust"}))],
-//! );
 //! ```
+//!
+//! Use the URP interface instead for UDML compliance.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -383,16 +402,39 @@ impl ContentBlock {
 // ============================================================================
 // OpenAI-Compatible Tool Types
 // ============================================================================
+//
+// NOTE: These types are internal and should only be accessed through the UDML/URP
+// interface when the `udml` feature is enabled. Direct usage is deprecated and will
+// be removed in a future version.
+//
+// For new code, use `UmfHandler::handle(urp)` with appropriate URP operations.
+//
+// These types remain public for backward compatibility but are not part of the
+// stable API when using UDML.
 
 /// Function call structure for tool invocations
+/// 
+/// **DEPRECATED**: Use UDML/URP interface instead when `udml` feature is enabled.
+/// Access through `UmfHandler::handle(urp)` operations.
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[cfg_attr(feature = "udml", deprecated(
+    since = "0.2.0",
+    note = "Use UDML/URP interface through UmfHandler::handle(urp) instead"
+))]
 pub struct FunctionCall {
     pub name: String,
     pub arguments: String,
 }
 
 /// Tool call structure for function calling
+///
+/// **DEPRECATED**: Use UDML/URP interface instead when `udml` feature is enabled.
+/// Access through `UmfHandler::handle(urp)` operations.
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[cfg_attr(feature = "udml", deprecated(
+    since = "0.2.0",
+    note = "Use UDML/URP interface through UmfHandler::handle(urp) instead"
+))]
 pub struct ToolCall {
     pub id: String,
     #[serde(rename = "type")]
@@ -401,7 +443,14 @@ pub struct ToolCall {
 }
 
 /// Function definition for tools
+///
+/// **DEPRECATED**: Use UDML/URP interface instead when `udml` feature is enabled.
+/// Access through `UmfHandler::handle(urp)` operations.
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[cfg_attr(feature = "udml", deprecated(
+    since = "0.2.0",
+    note = "Use UDML/URP interface through UmfHandler::handle(urp) instead"
+))]
 pub struct Function {
     pub name: String,
     pub description: String,
@@ -409,7 +458,14 @@ pub struct Function {
 }
 
 /// Tool definition for OpenAI-compatible tools
+///
+/// **DEPRECATED**: Use UDML/URP interface instead when `udml` feature is enabled.
+/// Access through `UmfHandler::handle(urp)` operations.
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[cfg_attr(feature = "udml", deprecated(
+    since = "0.2.0",
+    note = "Use UDML/URP interface through UmfHandler::handle(urp) instead"
+))]
 pub struct Tool {
     #[serde(rename = "type")]
     pub r#type: String,
@@ -417,7 +473,14 @@ pub struct Tool {
 }
 
 /// Result of generation with tools
+///
+/// **DEPRECATED**: Use UDML/URP interface instead when `udml` feature is enabled.
+/// Access through `UmfHandler::handle(urp)` operations.
 #[derive(Debug)]
+#[cfg_attr(feature = "udml", deprecated(
+    since = "0.2.0",
+    note = "Use UDML/URP interface through UmfHandler::handle(urp) instead"
+))]
 pub enum GenerateResult {
     Content(String),
     ToolCalls(Vec<ToolCall>),

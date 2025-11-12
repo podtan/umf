@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Compile-time UDML validation using `udml` crate
   - Runtime access to UDML specification via `udml_spec` module
   - New `udml` feature flag for optional UDML/URP functionality
+- **Standard UDML Interface**: `UmfHandler` with uniform `handle(Urp)` method
+  - Routes to 9 operation handlers for all message operations
+  - Message creation: create-system-message, create-user-message, create-assistant-message, etc.
+  - Transform operations: to-chatml, from-chatml, extract-text-content, count-tokens
+  - Helper function `create_message_urp()` for creating URPs
 - **UDML Domains Defined**:
   - Information: 9 message entities (InternalMessage, ChatML, streaming, etc.)
   - Access: 4 access rules for message operations
@@ -24,14 +29,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Coordination: 2 primitives for orchestration patterns
 - **Generated Constants**: Entity IDs, operation IDs, and schema references from UDML spec
 - **Build Integration**: `build.rs` validates UDML at compile time
+- **Dependencies**: Added `chrono` and `ulid` for URP timestamp/ID generation
 
 ### Changed
 - Bumped `udml` dependency to `0.1.0` (build and optional runtime)
-- Enhanced module organization with `udml_spec` module
+- Enhanced module organization with `udml_spec` and `urp_handler` modules
+
+### Deprecated
+- **Direct struct access deprecated** when `udml` feature is enabled:
+  - `ToolCall`, `FunctionCall`, `Function`, `Tool`, `GenerateResult` types
+  - These types are now internal implementation details
+  - **Migration**: Use `UmfHandler::handle(urp)` with appropriate URP operations instead
+  - Direct access remains available for backward compatibility but will be removed in v0.3.0
 
 ### Documentation
 - Added comprehensive UDML specification documenting all message operations
 - Schema references for all message types and transformations
+- Updated main documentation to encourage UDML-first usage
+- Added deprecation warnings for direct struct access
 
 ## [0.1.0] - 2025-10-30
 
