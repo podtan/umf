@@ -41,6 +41,7 @@ provides:
       - id: internal-message
         kind: struct
         purpose: "Core message representation with role, content, and metadata"
+        owners: [umf]
         fields:
           - role
           - content
@@ -55,6 +56,7 @@ provides:
       - id: message-role
         kind: enum
         purpose: "Message role in conversation (system, user, assistant, tool)"
+        owners: [umf]
         fields:
           - system
           - user
@@ -68,6 +70,7 @@ provides:
       - id: message-content
         kind: enum
         purpose: "Message content representation (text or structured blocks)"
+        owners: [umf]
         fields:
           - text
           - blocks
@@ -79,6 +82,7 @@ provides:
       - id: content-block
         kind: enum
         purpose: "Structured content block for multimodal messages (text, image, tool-use, tool-result)"
+        owners: [umf]
         fields:
           - text
           - image
@@ -92,6 +96,7 @@ provides:
       - id: tool-call
         kind: struct
         purpose: "Represents a tool/function call from LLM"
+        owners: [umf]
         fields:
           - id
           - type
@@ -104,6 +109,7 @@ provides:
       - id: function-call
         kind: struct
         purpose: "Function call details with name and arguments"
+        owners: [umf]
         fields:
           - name
           - arguments
@@ -115,6 +121,7 @@ provides:
       - id: chatml-message
         kind: struct
         purpose: "ChatML formatted message for provider communication"
+        owners: [umf]
         fields:
           - role
           - content
@@ -129,6 +136,7 @@ provides:
       - id: stream-chunk
         kind: struct
         purpose: "Individual chunk from streaming LLM response"
+        owners: [umf]
         fields:
           - delta
           - finish_reason
@@ -141,6 +149,7 @@ provides:
       - id: accumulated-response
         kind: struct
         purpose: "Complete accumulated streaming response"
+        owners: [umf]
         fields:
           - content
           - tool_calls
@@ -158,18 +167,24 @@ provides:
     purpose: "Defines access control and visibility rules for message operations"
     rules:
       - id: message-read
-        purpose: "Allow reading message content and metadata"
+        visibility: internal
+        purpose: "Allow reading message content and metadata for all message types"
+        target: "internal-message"
+        read: true
+        write: false
+        delete: false
         requires:
           - valid-message-reference
         constraints:
           - message-exists
-        applicable_to:
-          - internal-message
-          - chatml-message
-          - stream-chunk
         
       - id: message-create
+        visibility: internal
         purpose: "Allow creating new messages with role and content"
+        target: "internal-message"
+        read: true
+        write: true
+        delete: false
         requires:
           - valid-role
           - valid-content
@@ -177,29 +192,31 @@ provides:
           - role-is-valid-enum
           - content-not-empty-for-text
           - tool-messages-have-call-id
-        applicable_to:
-          - internal-message
         
       - id: stream-subscribe
+        visibility: internal
         purpose: "Allow subscribing to streaming message responses"
+        target: "stream-chunk"
+        read: true
+        write: false
+        delete: false
         requires:
           - streaming-feature-enabled
         constraints:
           - valid-stream-connection
-        applicable_to:
-          - stream-chunk
-          - accumulated-response
         
       - id: format-convert
+        visibility: internal
         purpose: "Allow converting between internal and provider formats"
+        target: "internal-message"
+        read: true
+        write: true
+        delete: false
         requires:
           - valid-source-format
           - valid-target-format
         constraints:
           - format-compatibility
-        applicable_to:
-          - internal-message
-          - chatml-message
 
   # ============================================================================
   # MANIPULATION DOMAIN - Message Mutation Operations

@@ -21,10 +21,18 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tiktoken-rs = "0.5"
 futures-util = { version = "0.3", optional = true }
+# UDML support for runtime URP handling
+udml = { version = "0.1.0", optional = true }
+
+[build-dependencies]
+# UDML for compile-time specification validation
+udml = "0.1.0"
 
 [features]
 default = []
 streaming = ["futures-util"]
+# Enable UDML/URP support for standardized message handling
+udml = ["dep:udml"]
 
 [dev-dependencies]
 # No additional dev dependencies needed for now

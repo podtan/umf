@@ -1,0 +1,107 @@
+//! UDML specification and URP support for UMF
+//!
+//! This module provides access to UMF's UDML specification and enables
+//! creating URP (UDML Runtime Packets) for standardized message handling.
+
+#[cfg(feature = "udml")]
+use udml::prelude::*;
+
+/// The embedded UDML specification for UMF
+pub const UDML_SPEC_YAML: &str = include_str!("../umf.udml.yaml");
+
+/// UMF component ID as defined in UDML spec
+pub const COMPONENT_ID: &str = "umf";
+
+/// Load the UDML specification document
+#[cfg(feature = "udml")]
+pub fn load_specification() -> Result<UdmlDocument> {
+    UdmlDocument::from_yaml(UDML_SPEC_YAML)
+}
+
+/// UDML domain entity IDs for UMF
+pub mod entities {
+    pub const INTERNAL_MESSAGE: &str = "internal-message";
+    pub const MESSAGE_ROLE: &str = "message-role";
+    pub const MESSAGE_CONTENT: &str = "message-content";
+    pub const CONTENT_BLOCK: &str = "content-block";
+    pub const TOOL_CALL: &str = "tool-call";
+    pub const FUNCTION_CALL: &str = "function-call";
+    pub const CHATML_MESSAGE: &str = "chatml-message";
+    pub const STREAM_CHUNK: &str = "stream-chunk";
+    pub const ACCUMULATED_RESPONSE: &str = "accumulated-response";
+}
+
+/// UDML access rule IDs
+pub mod access_rules {
+    pub const MESSAGE_READ: &str = "message-read";
+    pub const MESSAGE_CREATE: &str = "message-create";
+    pub const STREAM_SUBSCRIBE: &str = "stream-subscribe";
+    pub const FORMAT_CONVERT: &str = "format-convert";
+}
+
+/// UDML manipulation operation IDs
+pub mod operations {
+    pub const CREATE_SYSTEM_MESSAGE: &str = "create-system-message";
+    pub const CREATE_USER_MESSAGE: &str = "create-user-message";
+    pub const CREATE_ASSISTANT_MESSAGE: &str = "create-assistant-message";
+    pub const CREATE_ASSISTANT_WITH_TOOLS: &str = "create-assistant-with-tools";
+    pub const CREATE_TOOL_RESULT_MESSAGE: &str = "create-tool-result-message";
+    pub const ADD_METADATA: &str = "add-metadata";
+    pub const ACCUMULATE_STREAM_CHUNK: &str = "accumulate-stream-chunk";
+}
+
+/// UDML transform IDs for data extraction
+pub mod transforms {
+    pub const TO_CHATML: &str = "to-chatml";
+    pub const FROM_CHATML: &str = "from-chatml";
+    pub const EXTRACT_TEXT_CONTENT: &str = "extract-text-content";
+    pub const COUNT_TOKENS: &str = "count-tokens";
+    pub const PARSE_SSE_CHUNK: &str = "parse-sse-chunk";
+    pub const ACCUMULATE_STREAMING_RESPONSE: &str = "accumulate-streaming-response";
+}
+
+/// UDML route IDs for message movement
+pub mod routes {
+    pub const TO_PROVIDER: &str = "to-provider";
+    pub const FROM_PROVIDER_STREAM: &str = "from-provider-stream";
+    pub const INTERNAL_MESSAGE_PASSING: &str = "internal-message-passing";
+    pub const SERIALIZE_TO_JSON: &str = "serialize-to-json";
+    pub const DESERIALIZE_FROM_JSON: &str = "deserialize-from-json";
+}
+
+/// UDML coordination primitive IDs
+pub mod coordination {
+    pub const FORMAT_CONVERSION_PIPELINE: &str = "format-conversion-pipeline";
+    pub const STREAMING_ACCUMULATION: &str = "streaming-accumulation";
+    pub const MESSAGE_VALIDATION_LOCK: &str = "message-validation-lock";
+    pub const TOKEN_COUNTING_CACHE: &str = "token-counting-cache";
+}
+
+/// Helper to create schema references
+pub fn schema_ref(entity_id: &str) -> String {
+    format!("{}#{}", COMPONENT_ID, entity_id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_udml_spec_is_embedded() {
+        assert!(!UDML_SPEC_YAML.is_empty());
+        assert!(UDML_SPEC_YAML.contains("id: umf"));
+    }
+
+    #[test]
+    fn test_schema_ref() {
+        assert_eq!(schema_ref("internal-message"), "umf#internal-message");
+    }
+
+    #[cfg(feature = "udml")]
+    #[test]
+    fn test_load_specification() {
+        let spec = load_specification().expect("Should load UDML spec");
+        assert_eq!(spec.id, "umf");
+        assert_eq!(spec.layer, Layer::Runtime);
+    }
+}
