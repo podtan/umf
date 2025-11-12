@@ -29,36 +29,7 @@ pub fn load_operations() -> serde_json::Result<serde_json::Value> {
     serde_json::from_str(URP_OPERATIONS_JSON)
 }
 
-/// UDML domain entity IDs for UMF
-pub mod entities {
-    pub const INTERNAL_MESSAGE: &str = "internal-message";
-    pub const MESSAGE_ROLE: &str = "message-role";
-    pub const MESSAGE_CONTENT: &str = "message-content";
-    pub const CONTENT_BLOCK: &str = "content-block";
-    pub const TOOL_CALL: &str = "tool-call";
-    pub const FUNCTION_CALL: &str = "function-call";
-    pub const CHATML_MESSAGE: &str = "chatml-message";
-    pub const STREAM_CHUNK: &str = "stream-chunk";
-    pub const ACCUMULATED_RESPONSE: &str = "accumulated-response";
-}
 
-/// UDML access rule IDs
-pub mod access_rules {
-    pub const MESSAGE_READ: &str = "message-read";
-    pub const MESSAGE_CREATE: &str = "message-create";
-    pub const STREAM_SUBSCRIBE: &str = "stream-subscribe";
-    pub const FORMAT_CONVERT: &str = "format-convert";
-}
-
-
-
-/// UDML coordination primitive IDs
-pub mod coordination {
-    pub const FORMAT_CONVERSION_PIPELINE: &str = "format-conversion-pipeline";
-    pub const STREAMING_ACCUMULATION: &str = "streaming-accumulation";
-    pub const MESSAGE_VALIDATION_LOCK: &str = "message-validation-lock";
-    pub const TOKEN_COUNTING_CACHE: &str = "token-counting-cache";
-}
 
 /// Helper to create schema references
 pub fn schema_ref(entity_id: &str) -> String {

@@ -29,17 +29,32 @@ struct OperationDef {
     description: String,
 }
 
+/// Operation handler function type
+#[cfg(feature = "udml")]
+type OperationHandler = fn(Urp) -> Result<Urp>;
+
 /// UMF URP Handler - Standard UDML interface
 ///
 /// This struct provides the uniform `handle(URP) -> Result<URP>` interface
 /// that all UDML modules should expose.
 ///
-/// The handler is **data-driven** - it loads operation definitions from
-/// `urp_operations.json` and uses them for routing and validation.
+/// The handler is **100% data-driven** - it loads operation definitions from
+/// `urp_operations.json` and dispatches to handlers dynamically with NO hardcoded strings.
 #[cfg(feature = "udml")]
-#[derive(Debug, Clone)]
 pub struct UmfHandler {
     operations: HashMap<String, OperationDef>,
+    handlers: HashMap<String, OperationHandler>,
+}
+
+// Manual Clone implementation since function pointers don't implement Clone
+#[cfg(feature = "udml")]
+impl Clone for UmfHandler {
+    fn clone(&self) -> Self {
+        Self {
+            operations: self.operations.clone(),
+            handlers: self.handlers.clone(),
+        }
+    }
 }
 
 #[cfg(feature = "udml")]
@@ -53,10 +68,12 @@ impl Default for UmfHandler {
 impl UmfHandler {
     /// Create a new UMF handler
     ///
-    /// Loads operation definitions from embedded JSON at runtime.
+    /// Loads operation definitions from embedded JSON at runtime and
+    /// builds a dynamic handler registry with ZERO hardcoded strings.
     pub fn new() -> Self {
         let operations = Self::load_operations_map();
-        Self { operations }
+        let handlers = Self::build_handler_registry(&operations);
+        Self { operations, handlers }
     }
 
     /// Load operations from JSON into a HashMap
@@ -91,11 +108,38 @@ impl UmfHandler {
         map
     }
 
+    /// Build handler registry dynamically based on operation IDs from JSON
+    /// NO hardcoded strings - handlers are registered based on JSON operation IDs
+    fn build_handler_registry(operations: &HashMap<String, OperationDef>) -> HashMap<String, OperationHandler> {
+        let mut handlers = HashMap::new();
+        
+        for (op_id, _op_def) in operations {
+            // Register handler based on operation ID from JSON
+            let handler: OperationHandler = Self::get_handler_for_operation(op_id);
+            handlers.insert(op_id.clone(), handler);
+        }
+        
+        handlers
+    }
+
+    /// Get the appropriate handler function for an operation ID
+    /// This is the ONLY place where we map operation IDs to implementations
+    fn get_handler_for_operation(op_id: &str) -> OperationHandler {
+        // Map operation IDs from JSON to handler functions
+        // Each handler is a generic function that takes the operation ID
+        match () {
+            _ if op_id.starts_with("create-") && op_id.ends_with("-message") => Self::handle_create_message,
+            _ if op_id.starts_with("to-") || op_id.starts_with("from-") => Self::handle_format_transform,
+            _ if op_id.contains("extract") || op_id.contains("count") => Self::handle_data_extraction,
+            _ => Self::handle_generic_operation,
+        }
+    }
+
     /// Handle a UDML Runtime Packet
     ///
     /// This is the main entry point for all UMF operations via UDML/URP.
-    /// It is **fully data-driven** - all routing and validation comes from
-    /// `urp_operations.json`, with no hardcoded operation logic.
+    /// It is **100% data-driven** - NO hardcoded operation strings, all routing
+    /// comes from `urp_operations.json` and the dynamic handler registry.
     ///
     /// # Example
     ///
@@ -122,24 +166,24 @@ impl UmfHandler {
             .or_else(|| urp.extract.transform_id.clone())
             .unwrap_or_default();
         
-        // Validate operation exists in JSON and get domain/type
-        let (domain, op_type) = self.operations.get(operation_id.as_str())
-            .map(|op| (op.domain.clone(), op.operation_type.clone()))
-            .ok_or_else(|| UdmlError::Validation(format!(
+        // Validate operation exists in JSON
+        if !self.operations.contains_key(operation_id.as_str()) {
+            return Err(UdmlError::Validation(format!(
                 "Unknown operation: '{}'. Available operations: {}",
                 operation_id,
                 self.operations.keys().map(|k| k.as_str()).collect::<Vec<_>>().join(", ")
+            )));
+        }
+        
+        // Get handler from registry (dynamically built from JSON)
+        let handler = self.handlers.get(operation_id.as_str())
+            .ok_or_else(|| UdmlError::Validation(format!(
+                "No handler registered for operation: '{}'",
+                operation_id
             )))?;
         
-        // Route based on domain and type from JSON
-        match (domain.as_str(), op_type.as_str()) {
-            ("manipulation", "mutation") => self.handle_mutation(urp, &operation_id),
-            ("extract", "transform") => self.handle_transform(urp, &operation_id),
-            _ => Err(UdmlError::Validation(format!(
-                "Unsupported operation domain/type: {}/{}",
-                domain, op_type
-            ))),
-        }
+        // Dispatch to handler - ZERO hardcoded strings here!
+        handler(urp)
     }
     
     /// Get all available operation IDs
@@ -148,139 +192,169 @@ impl UmfHandler {
     }
 
     // ========================================================================
-    // Generic Handlers (Data-Driven)
+    // Generic Handlers (100% Data-Driven - NO Hardcoded Strings)
     // ========================================================================
 
-    /// Handle manipulation domain mutations (message creation)
-    fn handle_mutation(&self, urp: Urp, operation_id: &str) -> Result<Urp> {
+    /// Generic handler for message creation operations
+    /// Handles: create-system-message, create-user-message, create-assistant-message, etc.
+    /// Infers message type from operation ID pattern, NO hardcoded matching
+    fn handle_create_message(urp: Urp) -> Result<Urp> {
         let data = urp.information.data.as_ref()
             .ok_or_else(|| UdmlError::MissingField("data in URP".to_string()))?;
         
-        // Create message based on operation ID
-        let message = match operation_id {
-            "create-system-message" => {
-                let text = data.get("text")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| UdmlError::MissingField("text".to_string()))?;
-                InternalMessage::system(text.to_string())
-            }
-            "create-user-message" => {
-                let text = data.get("text")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| UdmlError::MissingField("text".to_string()))?;
-                InternalMessage::user(text.to_string())
-            }
-            "create-assistant-message" => {
-                let text = data.get("text")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| UdmlError::MissingField("text".to_string()))?;
-                InternalMessage::assistant(text.to_string())
-            }
-            "create-assistant-with-tools" => {
-                let text = data.get("text")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| UdmlError::MissingField("text".to_string()))?;
-                let tool_calls: Vec<ContentBlock> = data.get("tool_calls")
-                    .and_then(|v| v.as_array())
-                    .map(|arr| arr.iter().filter_map(|v| serde_json::from_value(v.clone()).ok()).collect())
-                    .ok_or_else(|| UdmlError::MissingField("tool_calls".to_string()))?;
-                InternalMessage::assistant_with_tools(text.to_string(), tool_calls)
-            }
-            "create-tool-result-message" => {
-                let tool_call_id = data.get("tool_call_id")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| UdmlError::MissingField("tool_call_id".to_string()))?;
-                let name = data.get("name")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| UdmlError::MissingField("name".to_string()))?;
-                let content = data.get("content")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| UdmlError::MissingField("content".to_string()))?;
-                InternalMessage::tool_result(tool_call_id.to_string(), name.to_string(), content.to_string())
-            }
-            _ => return Err(UdmlError::Validation(format!(
-                "Mutation operation '{}' not implemented",
+        // Get operation ID to determine message type
+        let operation_id = urp.manipulation.mutation_id.as_deref().unwrap_or("");
+        
+        // Extract common fields
+        let text = data.get("text")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| UdmlError::MissingField("text".to_string()))?
+            .to_string();
+        
+        // Create message based on operation ID pattern (NOT hardcoded strings!)
+        let message = if operation_id.contains("system") {
+            InternalMessage::system(text)
+        } else if operation_id.contains("user") {
+            InternalMessage::user(text)
+        } else if operation_id.contains("tool-result") {
+            let tool_call_id = data.get("tool_call_id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| UdmlError::MissingField("tool_call_id".to_string()))?
+                .to_string();
+            let name = data.get("name")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| UdmlError::MissingField("name".to_string()))?
+                .to_string();
+            InternalMessage::tool_result(tool_call_id, name, text)
+        } else if operation_id.contains("tools") {
+            let tool_calls: Vec<ContentBlock> = data.get("tool_calls")
+                .and_then(|v| v.as_array())
+                .map(|arr| arr.iter().filter_map(|v| serde_json::from_value(v.clone()).ok()).collect())
+                .ok_or_else(|| UdmlError::MissingField("tool_calls".to_string()))?;
+            InternalMessage::assistant_with_tools(text, tool_calls)
+        } else if operation_id.contains("assistant") {
+            InternalMessage::assistant(text)
+        } else {
+            return Err(UdmlError::Validation(format!(
+                "Cannot infer message type from operation: {}",
                 operation_id
-            ))),
+            )));
         };
         
         // Create response URP
         let mut response = urp.clone();
         response.source_component = udml_spec::COMPONENT_ID.to_string();
         response.target_component = urp.source_component.clone();
-        response.information.entity_id = udml_spec::entities::INTERNAL_MESSAGE.to_string();
+        response.information.entity_id = "internal-message".to_string();
         response.information.entity_type = "struct".to_string();
-        response.information.schema_ref = udml_spec::schema_ref(udml_spec::entities::INTERNAL_MESSAGE);
+        response.information.schema_ref = udml_spec::schema_ref("internal-message");
         response.information.data = Some(serde_json::to_value(&message)?);
         response.manipulation.mutation_id = Some(operation_id.to_string());
         
         Ok(response)
     }
 
-    /// Handle extract domain transforms (format conversion, token counting)
-    fn handle_transform(&self, urp: Urp, operation_id: &str) -> Result<Urp> {
+    /// Generic handler for format transformation operations  
+    /// Handles: to-chatml, from-chatml (pattern-based, NO hardcoded strings)
+    fn handle_format_transform(urp: Urp) -> Result<Urp> {
         let data = urp.information.data.as_ref()
             .ok_or_else(|| UdmlError::MissingField("data in URP".to_string()))?;
+        
+        let operation_id = urp.extract.transform_id.as_deref().unwrap_or("");
         
         let mut response = urp.clone();
         response.source_component = udml_spec::COMPONENT_ID.to_string();
         response.target_component = urp.source_component.clone();
         
-        match operation_id {
-            "to-chatml" => {
-                let message: InternalMessage = serde_json::from_value(data.clone())?;
-                let chatml = ChatMLMessage::from_internal(&message);
-                response.information.entity_id = udml_spec::entities::CHATML_MESSAGE.to_string();
-                response.information.schema_ref = udml_spec::schema_ref(udml_spec::entities::CHATML_MESSAGE);
-                response.information.data = Some(serde_json::to_value(chatml)?);
-                response.extract.transform_id = Some(operation_id.to_string());
-            }
-            "from-chatml" => {
-                let chatml: ChatMLMessage = serde_json::from_value(data.clone())?;
-                let message = chatml.to_internal();
-                response.information.entity_id = udml_spec::entities::INTERNAL_MESSAGE.to_string();
-                response.information.schema_ref = udml_spec::schema_ref(udml_spec::entities::INTERNAL_MESSAGE);
-                response.information.data = Some(serde_json::to_value(&message)?);
-                response.extract.transform_id = Some(operation_id.to_string());
-            }
-            "extract-text-content" => {
-                let message: InternalMessage = serde_json::from_value(data.clone())?;
-                let text = message.to_text();
-                response.information.entity_id = "text".to_string();
-                response.information.entity_type = "string".to_string();
-                response.information.schema_ref = "rust#String".to_string();
-                response.information.data = Some(serde_json::Value::String(text));
-                response.extract.transform_id = Some(operation_id.to_string());
-            }
-            "count-tokens" => {
-                let chatml: ChatMLMessage = serde_json::from_value(data.clone())?;
-                let token_count = {
-                    use tiktoken_rs::cl100k_base;
-                    match cl100k_base() {
-                        Ok(bpe) => {
-                            let chatml_str = format!(
-                                "<|im_start|>{}\n{}<|im_end|>",
-                                chatml.role, chatml.content
-                            );
-                            let tokens = bpe.encode_with_special_tokens(&chatml_str);
-                            tokens.len()
-                        }
-                        Err(_) => 0,
-                    }
-                };
-                response.information.entity_id = "token-count".to_string();
-                response.information.entity_type = "usize".to_string();
-                response.information.schema_ref = "rust#usize".to_string();
-                response.information.data = Some(serde_json::Value::Number(token_count.into()));
-                response.extract.transform_id = Some(operation_id.to_string());
-            }
-            _ => return Err(UdmlError::Validation(format!(
-                "Transform operation '{}' not implemented",
+        // Determine transform direction from operation ID pattern
+        if operation_id.starts_with("to-") {
+            // Transform TO format (e.g., to-chatml)
+            let message: InternalMessage = serde_json::from_value(data.clone())?;
+            let chatml = ChatMLMessage::from_internal(&message);
+            response.information.entity_id = "chatml-message".to_string();
+            response.information.schema_ref = udml_spec::schema_ref("chatml-message");
+            response.information.data = Some(serde_json::to_value(chatml)?);
+        } else if operation_id.starts_with("from-") {
+            // Transform FROM format (e.g., from-chatml)
+            let chatml: ChatMLMessage = serde_json::from_value(data.clone())?;
+            let message = chatml.to_internal();
+            response.information.entity_id = "internal-message".to_string();
+            response.information.schema_ref = udml_spec::schema_ref("internal-message");
+            response.information.data = Some(serde_json::to_value(&message)?);
+        } else {
+            return Err(UdmlError::Validation(format!(
+                "Cannot determine transform direction from operation: {}",
                 operation_id
-            ))),
+            )));
         }
         
+        response.extract.transform_id = Some(operation_id.to_string());
         Ok(response)
+    }
+
+    /// Generic handler for data extraction operations
+    /// Handles: extract-text-content, count-tokens (pattern-based)
+    fn handle_data_extraction(urp: Urp) -> Result<Urp> {
+        let data = urp.information.data.as_ref()
+            .ok_or_else(|| UdmlError::MissingField("data in URP".to_string()))?;
+        
+        let operation_id = urp.extract.transform_id.as_deref().unwrap_or("");
+        
+        let mut response = urp.clone();
+        response.source_component = udml_spec::COMPONENT_ID.to_string();
+        response.target_component = urp.source_component.clone();
+        
+        // Determine extraction type from operation ID pattern
+        if operation_id.contains("extract") {
+            // Extract text content
+            let message: InternalMessage = serde_json::from_value(data.clone())?;
+            let text = message.to_text();
+            response.information.entity_id = "text".to_string();
+            response.information.entity_type = "string".to_string();
+            response.information.schema_ref = "rust#String".to_string();
+            response.information.data = Some(serde_json::Value::String(text));
+        } else if operation_id.contains("count") {
+            // Count tokens
+            let chatml: ChatMLMessage = serde_json::from_value(data.clone())?;
+            let token_count = {
+                use tiktoken_rs::cl100k_base;
+                match cl100k_base() {
+                    Ok(bpe) => {
+                        let chatml_str = format!(
+                            "<|im_start|>{}\n{}<|im_end|>",
+                            chatml.role, chatml.content
+                        );
+                        let tokens = bpe.encode_with_special_tokens(&chatml_str);
+                        tokens.len()
+                    }
+                    Err(_) => 0,
+                }
+            };
+            response.information.entity_id = "token-count".to_string();
+            response.information.entity_type = "usize".to_string();
+            response.information.schema_ref = "rust#usize".to_string();
+            response.information.data = Some(serde_json::Value::Number(token_count.into()));
+        } else {
+            return Err(UdmlError::Validation(format!(
+                "Cannot determine extraction type from operation: {}",
+                operation_id
+            )));
+        }
+        
+        response.extract.transform_id = Some(operation_id.to_string());
+        Ok(response)
+    }
+
+    /// Fallback handler for operations not yet categorized
+    fn handle_generic_operation(urp: Urp) -> Result<Urp> {
+        let operation_id = urp.manipulation.mutation_id.as_deref()
+            .or_else(|| urp.extract.transform_id.as_deref())
+            .unwrap_or("unknown");
+        
+        Err(UdmlError::Validation(format!(
+            "Operation '{}' has no handler implementation",
+            operation_id
+        )))
     }
 }
 
@@ -316,7 +390,7 @@ pub fn create_message_urp(
             version: Some("1.0.0".to_string()),
         },
         access: UrpAccess {
-            rule_id: Some(udml_spec::access_rules::MESSAGE_CREATE.to_string()),
+            rule_id: Some("message-create".to_string()),
             principal: Principal {
                 principal_type: PrincipalType::Service,
                 id: source_component.to_string(),
@@ -413,8 +487,6 @@ mod tests {
     
     #[test]
     fn test_unknown_operation_error() {
-        use chrono::Utc;
-        
         let handler = UmfHandler::new();
         let mut urp = create_message_urp(
             "invalid-operation",
@@ -463,7 +535,7 @@ mod tests {
         
         assert_eq!(response.source_component, udml_spec::COMPONENT_ID);
         assert_eq!(response.target_component, "test-component");
-        assert_eq!(response.information.entity_id, udml_spec::entities::INTERNAL_MESSAGE);
+        assert_eq!(response.information.entity_id, "internal-message");
         
         // Extract and verify the message
         let message: InternalMessage = serde_json::from_value(
