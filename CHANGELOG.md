@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2025-11-12
+
+### Added
+- **UDML/URP Support**: Full Universal Data Morphism Language integration
+  - Complete UDML specification in `umf.udml.yaml` defining all six domains
+  - Compile-time UDML validation using `udml` crate
+  - Runtime access to UDML specification via `udml_spec` module
+  - New `udml` feature flag for optional UDML/URP functionality
+- **UDML Domains Defined**:
+  - Information: 9 message entities (InternalMessage, ChatML, streaming, etc.)
+  - Access: 4 access rules for message operations
+  - Manipulation: 7 mutations for message creation and updates
+  - Extract: 6 transforms for format conversion and token counting
+  - Movement: 3 routes for message flow (to provider, streaming, internal)
+  - Coordination: 2 primitives for orchestration patterns
+- **Generated Constants**: Entity IDs, operation IDs, and schema references from UDML spec
+- **Build Integration**: `build.rs` validates UDML at compile time
+
+### Changed
+- Bumped `udml` dependency to `0.1.0` (build and optional runtime)
+- Enhanced module organization with `udml_spec` module
+
+### Documentation
+- Added comprehensive UDML specification documenting all message operations
+- Schema references for all message types and transformations
+
 ## [0.1.0] - 2025-10-30
 
 ### Added
