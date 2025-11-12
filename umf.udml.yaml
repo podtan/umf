@@ -164,57 +164,40 @@ provides:
   # ACCESS DOMAIN - Message Access Rules
   # ============================================================================
   access:
-    purpose: "Defines access control and visibility rules for message operations"
     rules:
       - id: message-read
-        visibility: internal
-        purpose: "Allow reading message content and metadata for all message types"
         target: "internal-message"
-        read: true
-        write: false
-        delete: false
-        requires:
-          - valid-message-reference
+        read: "any"
+        visibility: internal
+        description: "Allow reading message content and metadata for all message types"
         constraints:
           - message-exists
         
       - id: message-create
-        visibility: internal
-        purpose: "Allow creating new messages with role and content"
         target: "internal-message"
-        read: true
-        write: true
-        delete: false
-        requires:
-          - valid-role
-          - valid-content
+        read: "any"
+        write: "any"
+        visibility: internal
+        description: "Allow creating new messages with role and content"
         constraints:
           - role-is-valid-enum
           - content-not-empty-for-text
           - tool-messages-have-call-id
         
       - id: stream-subscribe
-        visibility: internal
-        purpose: "Allow subscribing to streaming message responses"
         target: "stream-chunk"
-        read: true
-        write: false
-        delete: false
-        requires:
-          - streaming-feature-enabled
+        read: "any"
+        visibility: internal
+        description: "Allow subscribing to streaming message responses"
         constraints:
           - valid-stream-connection
         
       - id: format-convert
-        visibility: internal
-        purpose: "Allow converting between internal and provider formats"
         target: "internal-message"
-        read: true
-        write: true
-        delete: false
-        requires:
-          - valid-source-format
-          - valid-target-format
+        read: "any"
+        write: "any"
+        visibility: internal
+        description: "Allow converting between internal and provider formats"
         constraints:
           - format-compatibility
 
@@ -222,510 +205,174 @@ provides:
   # MANIPULATION DOMAIN - Message Mutation Operations
   # ============================================================================
   manipulation:
-    purpose: "Defines lawful mutations for message creation and modification"
     mutations:
       - id: create-system-message
-        operation: create
+        target: "internal-message"
         kind: create
-        purpose: "Create a new system message"
-        inputs:
-          - text_content
-        outputs:
-          - internal_message
+        operation: "InternalMessage::system(text: String) -> InternalMessage"
+        description: "Create a new system message with the given text content"
         preconditions:
           - text-not-empty
         postconditions:
           - role-is-system
-          - content-matches-input
         validation:
           - text-is-string
-        idempotent: false
         
       - id: create-user-message
-        operation: create
+        target: "internal-message"
         kind: create
-        purpose: "Create a new user message"
-        inputs:
-          - text_content
-        outputs:
-          - internal_message
-        preconditions:
-          - text-not-empty
-        postconditions:
-          - role-is-user
-          - content-matches-input
-        validation:
-          - text-is-string
-        idempotent: false
+        operation: "InternalMessage::user(text: String) -> InternalMessage"
+        description: "Create a new user message with the given text content"
         
       - id: create-assistant-message
-        operation: create
+        target: "internal-message"
         kind: create
-        purpose: "Create a new assistant message"
-        inputs:
-          - text_content
-        outputs:
-          - internal_message
-        preconditions:
-          - text-not-empty
-        postconditions:
-          - role-is-assistant
-          - content-matches-input
-        validation:
-          - text-is-string
-        idempotent: false
+        operation: "InternalMessage::assistant(text: String) -> InternalMessage"
+        description: "Create a new assistant message with the given text content"
         
       - id: create-assistant-with-tools
-        operation: create
+        target: "internal-message"
         kind: create
-        purpose: "Create assistant message with tool calls"
-        inputs:
-          - text_content
-          - tool_calls
-        outputs:
-          - internal_message
-        preconditions:
-          - text-not-empty
-          - tools-is-array
-          - tools-not-empty
-        postconditions:
-          - role-is-assistant
-          - content-has-text-and-tools
-        validation:
-          - each-tool-has-id-name-input
-        idempotent: false
+        operation: "InternalMessage::assistant_with_tools(text: String, tools: Vec<ContentBlock>) -> InternalMessage"
+        description: "Create assistant message with tool calls"
         
       - id: create-tool-result-message
-        operation: create
+        target: "internal-message"
         kind: create
-        purpose: "Create tool result message"
-        inputs:
-          - tool_call_id
-          - tool_name
-          - result_content
-        outputs:
-          - internal_message
-        preconditions:
-          - tool-call-id-not-empty
-          - tool-name-not-empty
-        postconditions:
-          - role-is-tool
-          - has-tool-call-id
-          - has-tool-name
-        validation:
-          - tool-call-id-is-string
-          - content-is-valid-block
-        idempotent: false
+        operation: "InternalMessage::tool_result(tool_call_id: String, name: String, content: ContentBlock) -> InternalMessage"
+        description: "Create tool result message"
         
       - id: add-metadata
-        operation: update
+        target: "internal-message"
         kind: update
-        purpose: "Add metadata key-value pair to message"
-        inputs:
-          - message
-          - key
-          - value
-        outputs:
-          - updated_message
-        preconditions:
-          - message-exists
-          - key-is-string
-          - value-is-string
-        postconditions:
-          - metadata-contains-key
-        validation:
-          - key-not-empty
-        idempotent: true
+        operation: "add_metadata(message: &mut InternalMessage, key: String, value: String)"
+        description: "Add metadata key-value pair to message"
         
       - id: accumulate-stream-chunk
-        operation: update
+        target: "accumulated-response"
         kind: update
-        purpose: "Accumulate streaming chunk into response"
-        inputs:
-          - accumulator
-          - chunk
-        outputs:
-          - updated_accumulator
-        preconditions:
-          - accumulator-initialized
-          - chunk-valid
-        postconditions:
-          - content-appended
-          - usage-updated
-        validation:
-          - chunk-schema-valid
-        idempotent: false
+        operation: "StreamingAccumulator::accumulate_chunk(chunk: StreamChunk)"
+        description: "Accumulate streaming chunk into response"
 
   # ============================================================================
   # EXTRACT DOMAIN - Message Transformations
   # ============================================================================
   extract:
-    purpose: "Defines data transformations and derivations for message formats"
     transforms:
       - id: to-chatml
+        inputs: ["internal-message"]
+        output: "chatml-message"
         method: template
-        purpose: "Transform InternalMessage to ChatML format"
-        inputs:
-          - entity_id: internal-message
-            required: true
-        output:
-          entity_id: chatml-message
-          schema_ref: "umf#chatml-message"
         deterministic: true
         cacheable: false
-        algorithm: "Map role, flatten content, preserve tool calls and metadata"
+        description: "Transform InternalMessage to ChatML format by mapping role and flattening content"
         
       - id: from-chatml
+        inputs: ["chatml-message"]
+        output: "internal-message"
         method: template
-        purpose: "Transform ChatML message to InternalMessage"
-        inputs:
-          - entity_id: chatml-message
-            required: true
-        output:
-          entity_id: internal-message
-          schema_ref: "umf#internal-message"
         deterministic: true
         cacheable: false
-        algorithm: "Map role, parse content structure, extract metadata"
+        description: "Transform ChatML message to InternalMessage by parsing content structure"
         
       - id: extract-text-content
+        inputs: ["internal-message"]
+        output: "string"
         method: projection
-        purpose: "Extract plain text from message content"
-        inputs:
-          - entity_id: internal-message
-            required: true
-        output:
-          entity_id: string
-          schema_ref: "rust#String"
         deterministic: true
         cacheable: true
-        algorithm: "Flatten content blocks to text, join with newlines"
+        description: "Extract plain text from message content blocks"
         
       - id: count-tokens
+        inputs: ["chatml-message"]
+        output: "token-count"
         method: algorithm
-        purpose: "Count tokens in message using tiktoken"
-        inputs:
-          - entity_id: chatml-message
-            required: true
-        output:
-          entity_id: token-count
-          schema_ref: "rust#usize"
         deterministic: true
         cacheable: true
-        algorithm: "cl100k_base tokenizer from tiktoken-rs"
+        description: "Count tokens in message using tiktoken cl100k_base"
         
       - id: parse-sse-chunk
+        inputs: ["raw-sse-line"]
+        output: "stream-chunk"
         method: algorithm
-        purpose: "Parse SSE (Server-Sent Events) streaming chunk"
-        inputs:
-          - entity_id: raw-sse-line
-            required: true
-        output:
-          entity_id: stream-chunk
-          schema_ref: "umf#stream-chunk"
         deterministic: true
         cacheable: false
-        algorithm: "Parse data: prefix, deserialize JSON, extract delta and finish_reason"
+        description: "Parse SSE (Server-Sent Events) streaming chunk from provider"
         
       - id: accumulate-streaming-response
+        inputs: ["stream-chunk"]
+        output: "accumulated-response"
         method: aggregation
-        purpose: "Accumulate streaming chunks into complete response"
-        inputs:
-          - entity_id: stream-chunk
-            required: true
-            multiple: true
-        output:
-          entity_id: accumulated-response
-          schema_ref: "umf#accumulated-response"
         deterministic: true
         cacheable: false
-        algorithm: "Append text deltas, merge tool calls, track usage and finish reason"
+        description: "Accumulate streaming chunks into complete response"
 
   # ============================================================================
   # MOVEMENT DOMAIN - Message Routing and Streaming
   # ============================================================================
   movement:
-    purpose: "Defines how messages flow through the system and to LLM providers"
     routes:
       - id: to-provider
         direction: out
+        from: "umf"
+        to: "llm-provider"
         medium: network
-        protocol: https
-        purpose: "Send formatted messages to LLM provider API"
+        payload: "chatml-message"
+        protocol: "https-json"
+        trigger: request
         reliability: at-least-once
         async: true
-        trigger: request
-        retry_policy:
-          max_retries: 3
-          backoff: exponential
-          initial_delay_ms: 100
-        timeout_ms: 30000
-        format: json
+        description: "Send formatted messages to LLM provider API"
         
       - id: from-provider-stream
         direction: in
+        from: "llm-provider"
+        to: "umf"
         medium: network
-        protocol: sse
-        purpose: "Receive streaming response chunks from LLM provider"
+        payload: "stream-chunk"
+        protocol: "sse"
+        trigger: event
         reliability: at-least-once
         async: true
-        trigger: event
-        retry_policy:
-          max_retries: 0
-          backoff: none
-        timeout_ms: 60000
-        format: sse-json
-        streaming: true
+        description: "Receive streaming response chunks from LLM provider"
         
       - id: internal-message-passing
         direction: bi
+        from: "umf"
+        to: "any"
         medium: memory
-        protocol: rust-ownership
-        purpose: "Pass messages between components in memory"
-        reliability: exactly-once
-        async: false
-        trigger: function-call
-        retry_policy:
-          max_retries: 0
-        timeout_ms: 0
-        format: native
-        
-      - id: serialize-to-json
-        direction: out
-        medium: memory
-        protocol: json
-        purpose: "Serialize message to JSON for storage or transmission"
-        reliability: exactly-once
-        async: false
+        payload: "internal-message"
         trigger: request
-        retry_policy:
-          max_retries: 0
-        timeout_ms: 1000
-        format: json
-        
-      - id: deserialize-from-json
-        direction: in
-        medium: memory
-        protocol: json
-        purpose: "Deserialize message from JSON"
         reliability: exactly-once
         async: false
-        trigger: request
-        retry_policy:
-          max_retries: 0
-        timeout_ms: 1000
-        format: json
+        description: "Pass messages between components in memory"
 
   # ============================================================================
   # COORDINATION DOMAIN - Message Processing Orchestration
   # ============================================================================
   coordination:
-    purpose: "Defines synchronization and orchestration patterns for message handling"
     primitives:
       - id: format-conversion-pipeline
         kind: orchestration
-        purpose: "Coordinate transformation from internal format to provider format"
-        participants:
-          - internal-message-holder
-          - chatml-formatter
-          - json-serializer
-        steps:
-          - validate-internal-message
-          - transform-to-chatml
-          - serialize-to-json
-        dependencies:
-          - step: validate-internal-message
-            requires: []
-          - step: transform-to-chatml
-            requires:
-              - validate-internal-message
-          - step: serialize-to-json
-            requires:
-              - transform-to-chatml
-        failure_strategy: rollback
+        participants: ["umf", "chatml-formatter"]
+        drives: ["to-provider"]
+        description: "Coordinate transformation from internal format to provider format"
+        guarantees:
+          - format-compatibility
+          - validation-before-send
         
       - id: streaming-accumulation
         kind: orchestration
-        purpose: "Coordinate accumulation of streaming chunks into complete response"
-        participants:
-          - stream-source
-          - accumulator
-          - chunk-parser
-        steps:
-          - initialize-accumulator
-          - receive-chunk
-          - parse-chunk
-          - accumulate-chunk
-          - check-finish-condition
-          - finalize-response
-        dependencies:
-          - step: initialize-accumulator
-            requires: []
-          - step: receive-chunk
-            requires:
-              - initialize-accumulator
-          - step: parse-chunk
-            requires:
-              - receive-chunk
-          - step: accumulate-chunk
-            requires:
-              - parse-chunk
-          - step: check-finish-condition
-            requires:
-              - accumulate-chunk
-          - step: finalize-response
-            requires:
-              - check-finish-condition
-        failure_strategy: retry-with-backoff
-        retry_policy:
-          max_retries: 3
-          backoff: exponential
-        
-      - id: message-validation-lock
-        kind: locking
-        purpose: "Ensure message validation is atomic"
-        participants:
-          - message-validator
-        lock_scope: message-instance
-        lock_duration_ms: 100
-        failure_strategy: fail-fast
-        
-      - id: token-counting-cache
-        kind: caching
-        purpose: "Cache token counts for identical messages"
-        participants:
-          - token-counter
-          - cache-store
-        cache_key_algorithm: "hash(chatml-message-content)"
-        cache_ttl_seconds: 3600
-        eviction_policy: lru
-        cache_size_limit: 10000
+        participants: ["stream-receiver", "accumulator"]
+        drives: ["from-provider-stream"]
+        description: "Coordinate accumulation of streaming chunks into complete response"
+        guarantees:
+          - ordered-accumulation
+          - complete-response
+        failure_modes:
+          - connection-lost
+          - incomplete-stream
 
 # ============================================================================
 # INTEGRATION PATTERNS
 # ============================================================================
-integration:
-  patterns:
-    - name: llm-provider-adapter
-      description: "Adapt internal messages to specific LLM provider formats (OpenAI, Anthropic, etc.)"
-      components:
-        - umf-formatter
-        - provider-client
-      data_flow:
-        - internal-message → to-chatml → provider-specific-format → provider-api
-        
-    - name: streaming-consumer
-      description: "Consume streaming responses from LLM providers"
-      components:
-        - sse-parser
-        - stream-accumulator
-      data_flow:
-        - provider-stream → parse-sse → accumulate → accumulated-response
-        
-    - name: message-persistence
-      description: "Serialize messages for storage and deserialization"
-      components:
-        - json-serializer
-        - storage-backend
-      data_flow:
-        - internal-message → serialize-json → storage → deserialize-json → internal-message
-
-  external_interfaces:
-    - protocol: json-api
-      description: "JSON serialization for external consumption"
-      operations:
-        - serialize-message
-        - deserialize-message
-        
-    - protocol: rust-api
-      description: "Native Rust API for direct usage"
-      operations:
-        - create-messages
-        - convert-formats
-        - stream-processing
-
-# ============================================================================
-# EXAMPLES
-# ============================================================================
-examples:
-  - id: simple-user-message
-    title: "Create a simple user message"
-    description: "Demonstrates basic message creation"
-    code: |
-      use umf::InternalMessage;
-      let msg = InternalMessage::user("Hello, world!");
-      
-  - id: assistant-with-tools
-    title: "Create assistant message with tool calls"
-    description: "Shows how to create messages with tool invocations"
-    code: |
-      use umf::{InternalMessage, ContentBlock};
-      let msg = InternalMessage::assistant_with_tools(
-          "Let me search for that",
-          vec![ContentBlock::tool_use("call_123", "search", json!({"q": "rust"}))],
-      );
-      
-  - id: streaming-response
-    title: "Process streaming LLM response"
-    description: "Demonstrates streaming chunk accumulation"
-    code: |
-      use umf::streaming::StreamingAccumulator;
-      let mut acc = StreamingAccumulator::new();
-      for chunk in stream {
-          acc.accumulate_chunk(chunk)?;
-      }
-      let response = acc.finalize();
-
-# ============================================================================
-# METADATA
-# ============================================================================
-metadata:
-  language: rust
-  rust_version: "1.70"
-  license: "MIT OR Apache-2.0"
-  documentation_url: "https://docs.rs/umf"
-  keywords:
-    - llm
-    - message-format
-    - chatml
-    - streaming
-    - provider-agnostic
-  categories:
-    - data-structures
-    - encoding
-
-# ============================================================================
-# RISKS AND CONSIDERATIONS
-# ============================================================================
-risks:
-  - id: token-count-accuracy
-    category: functional
-    likelihood: low
-    impact: medium
-    status: accepted
-    description: "Token counting may not match provider's exact algorithm"
-    mitigation: "Use tiktoken-rs which approximates OpenAI's tokenizer"
-    
-  - id: streaming-connection-failure
-    category: reliability
-    likelihood: medium
-    impact: high
-    status: mitigated
-    description: "Streaming connections can fail mid-response"
-    mitigation: "Implement retry logic with exponential backoff and timeout handling"
-    
-  - id: message-size-limit
-    category: performance
-    likelihood: medium
-    impact: medium
-    status: accepted
-    description: "Very large messages may cause memory issues"
-    mitigation: "Document recommended message size limits and consider chunking"
-    
-  - id: format-compatibility
-    category: integration
-    likelihood: low
-    impact: high
-    status: mitigated
-    description: "Provider format changes could break transformations"
-    mitigation: "Version provider adapters and maintain compatibility tests"
