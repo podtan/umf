@@ -43,7 +43,17 @@ pub use chatml::{ChatMLFormatter, ChatMLMessage, MessageRole as ChatMLMessageRol
 #[cfg(feature = "streaming")]
 pub mod streaming;
 #[cfg(feature = "streaming")]
-pub use streaming::{StreamingAccumulator, StreamChunk, AccumulatedResponse};
+pub use streaming::{AccumulatedResponse, StreamChunk, StreamingAccumulator};
+
+// ============================================================================
+// Events Support (for conversation tracking and storage)
+// ============================================================================
+
+pub mod events;
+pub use events::{
+    Event, EventEnvelope, EventType, McpContext, MessageEvent, ModelInfo, ToolCall as EventToolCall,
+    ToolCallEvent, ToolCallStatus, ToolResult, ToolResultEvent,
+};
 
 // ============================================================================
 // Core Message Types
