@@ -10,6 +10,16 @@
 //! 2. **Provider-Agnostic**: Can be converted to any LLM provider format
 //! 3. **Metadata Support**: Includes optional metadata for internal tracking
 //! 4. **Tool Calling Support**: Full support for function/tool calling
+//! 5. **Hub Model**: Internal format acts as conversion hub for all protocols
+//!
+//! ## Features
+//!
+//! - `internal` (default) - Core hub types for protocol conversion
+//! - `chatml` - ChatML message formatting
+//! - `events` - Conversation event tracking
+//! - `streaming` - Streaming response support
+//! - `mcp` - Model Context Protocol types and conversion
+//! - `full` - All features enabled
 //!
 //! ## Usage
 //!
@@ -28,6 +38,31 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+// ============================================================================
+// Internal Format (Hub Model)
+// ============================================================================
+
+#[cfg(feature = "internal")]
+pub mod internal;
+
+#[cfg(feature = "internal")]
+pub use internal::{
+    ConversionError, FromInternal, InternalTool, InternalToolCall, InternalToolResult, ToInternal,
+    TryFromInternal, TryToInternal,
+};
+
+// ============================================================================
+// MCP Support
+// ============================================================================
+
+#[cfg(feature = "mcp")]
+pub mod mcp;
+
+#[cfg(feature = "mcp")]
+pub use mcp::{
+    McpContent, McpInputSchema, McpTool, McpToolAnnotations, McpToolCall, McpToolResult,
+};
 
 // ============================================================================
 // ChatML Support
