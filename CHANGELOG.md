@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2025-01-27
+
+### Added
+- **MCP Module** (`mcp` feature): New module for Model Context Protocol tool support
+  - `McpTool`: MCP-native tool representation with name, description, and input schema
+  - `McpToolAnnotations`: Tool annotations (title, read_only_hint, destructive_hint, etc.)
+  - `McpTool::new()`: Constructor for creating tools with name, description, and parameters
+  - `McpTool::from_schema()`: Create tool from raw JSON schema value
+  - Builder methods: `with_title()`, `with_read_only_hint()`, `with_destructive_hint()`, 
+    `with_idempotent_hint()`, `with_open_world_hint()` for fluent configuration
+- **Internal Module** (`internal` feature): Hub model for multi-source tool aggregation
+  - `InternalToolDefinition`: Provider-agnostic tool representation
+  - Conversion traits between `InternalToolDefinition` and `McpTool`
+  - `impl From<McpTool> for InternalToolDefinition`
+  - `impl From<InternalToolDefinition> for McpTool`
+
+### Changed
+- MCP tools now use proper constructor methods instead of direct struct initialization
+- Internal tools can be seamlessly converted to/from MCP format
+
 ## [0.1.4] - 2025-12-10
 
 ### Added

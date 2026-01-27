@@ -35,6 +35,97 @@ pub struct McpTool {
     pub annotations: Option<McpToolAnnotations>,
 }
 
+impl McpTool {
+    /// Create a new MCP tool with required fields.
+    pub fn new(
+        name: impl Into<String>,
+        description: impl Into<String>,
+        input_schema: McpInputSchema,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            title: None,
+            description: Some(description.into()),
+            input_schema,
+            output_schema: None,
+            annotations: None,
+        }
+    }
+
+    /// Create a tool from raw JSON schema value.
+    ///
+    /// This is useful when parsing tool definitions from servers
+    /// where the input schema is provided as a JSON Value.
+    pub fn from_schema(
+        name: impl Into<String>,
+        description: impl Into<String>,
+        schema: Value,
+    ) -> Self {
+        // Extract properties and required from the schema
+        let properties = schema.get("properties").cloned();
+        let required = schema
+            .get("required")
+            .and_then(|r| r.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let input_schema = McpInputSchema {
+            schema_type: schema
+                .get("type")
+                .and_then(|t| t.as_str())
+                .unwrap_or("object")
+                .to_string(),
+            properties,
+            required,
+            additional: None,
+        };
+
+        Self::new(name, description, input_schema)
+    }
+
+    /// Set the human-readable title.
+    pub fn with_title(mut self, title: impl Into<String>) -> Self {
+        self.title = Some(title.into());
+        self
+    }
+
+    /// Set read-only hint annotation.
+    pub fn with_read_only_hint(mut self, read_only: bool) -> Self {
+        self.annotations
+            .get_or_insert_with(Default::default)
+            .read_only_hint = Some(read_only);
+        self
+    }
+
+    /// Set destructive hint annotation.
+    pub fn with_destructive_hint(mut self, destructive: bool) -> Self {
+        self.annotations
+            .get_or_insert_with(Default::default)
+            .destructive_hint = Some(destructive);
+        self
+    }
+
+    /// Set idempotent hint annotation.
+    pub fn with_idempotent_hint(mut self, idempotent: bool) -> Self {
+        self.annotations
+            .get_or_insert_with(Default::default)
+            .idempotent_hint = Some(idempotent);
+        self
+    }
+
+    /// Set open-world hint annotation.
+    pub fn with_open_world_hint(mut self, open_world: bool) -> Self {
+        self.annotations
+            .get_or_insert_with(Default::default)
+            .open_world_hint = Some(open_world);
+        self
+    }
+}
+
 /// JSON Schema for MCP tool input.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -185,6 +276,73 @@ pub enum McpContent {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn test_mcp_tool_new() {
+        let input_schema = McpInputSchema::object(
+            json!({
+                "query": {"type": "string"}
+            }),
+            vec!["query".to_string()],
+        );
+
+        let tool = McpTool::new("search", "Search for items", input_schema);
+        assert_eq!(tool.name, "search");
+        assert_eq!(tool.description, Some("Search for items".to_string()));
+        assert!(tool.title.is_none());
+        assert!(tool.annotations.is_none());
+    }
+
+    #[test]
+    fn test_mcp_tool_from_schema() {
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "location": {"type": "string"},
+                "units": {"type": "string", "enum": ["celsius", "fahrenheit"]}
+            },
+            "required": ["location"]
+        });
+
+        let tool = McpTool::from_schema("get_weather", "Get current weather", schema);
+        assert_eq!(tool.name, "get_weather");
+        assert_eq!(
+            tool.description,
+            Some("Get current weather".to_string())
+        );
+        assert_eq!(tool.input_schema.schema_type, "object");
+        assert_eq!(tool.input_schema.required, vec!["location"]);
+        assert!(tool.input_schema.properties.is_some());
+    }
+
+    #[test]
+    fn test_mcp_tool_builder_methods() {
+        let input_schema = McpInputSchema::empty();
+
+        let tool = McpTool::new("list_files", "List files in directory", input_schema)
+            .with_title("List Files")
+            .with_read_only_hint(true)
+            .with_idempotent_hint(true);
+
+        assert_eq!(tool.title, Some("List Files".to_string()));
+        let annotations = tool.annotations.unwrap();
+        assert_eq!(annotations.read_only_hint, Some(true));
+        assert_eq!(annotations.idempotent_hint, Some(true));
+        assert!(annotations.destructive_hint.is_none());
+    }
+
+    #[test]
+    fn test_mcp_tool_destructive_hint() {
+        let input_schema = McpInputSchema::empty();
+
+        let tool = McpTool::new("delete_file", "Delete a file", input_schema)
+            .with_destructive_hint(true)
+            .with_open_world_hint(false);
+
+        let annotations = tool.annotations.unwrap();
+        assert_eq!(annotations.destructive_hint, Some(true));
+        assert_eq!(annotations.open_world_hint, Some(false));
+    }
 
     #[test]
     fn test_mcp_tool_serialization() {
