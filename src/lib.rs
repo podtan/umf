@@ -427,8 +427,15 @@ pub struct Tool {
 /// Result of generation with tools
 #[derive(Debug)]
 pub enum GenerateResult {
+    /// Text-only response
     Content(String),
-    ToolCalls(Vec<ToolCall>),
+    /// Tool calls with optional preceding text content
+    ToolCalls {
+        /// Tool calls to execute
+        calls: Vec<ToolCall>,
+        /// Optional text content that preceded the tool calls
+        content: Option<String>,
+    },
 }
 
 // ============================================================================
