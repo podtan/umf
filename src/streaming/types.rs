@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 pub enum StreamChunk {
     /// Text content delta
     Text(String),
+    /// Reasoning/thinking content delta (from thinking models like GLM, Qwen)
+    Reasoning(String),
     /// Tool call delta (index-based like OpenAI SSE format)
     /// Contains partial updates to tool call at given index
     ToolCallDelta {
@@ -24,6 +26,8 @@ pub enum StreamChunk {
 pub struct AccumulatedResponse {
     /// Accumulated text content
     pub text: String,
+    /// Accumulated reasoning/thinking content
+    pub reasoning: String,
     /// Accumulated tool calls (in index order)
     pub tool_calls: Vec<crate::ToolCall>,
 }

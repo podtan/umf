@@ -11,6 +11,7 @@ use std::collections::HashMap;
 #[derive(Debug, Default)]
 pub struct StreamingAccumulator {
     text: String,
+    reasoning: String,
     tool_calls: HashMap<usize, crate::ToolCall>,
 }
 
@@ -25,6 +26,10 @@ impl StreamingAccumulator {
         match chunk {
             StreamChunk::Text(text) => {
                 self.text.push_str(&text);
+                false // Not done
+            }
+            StreamChunk::Reasoning(reasoning) => {
+                self.reasoning.push_str(&reasoning);
                 false // Not done
             }
             StreamChunk::ToolCallDelta { index, id, name, arguments_delta } => {
@@ -59,7 +64,6 @@ impl StreamingAccumulator {
 
     /// Get the accumulated response
     pub fn finish(self) -> AccumulatedResponse {
-        // Convert HashMap to Vec, filtering out empty tool calls
         let tool_calls: Vec<crate::ToolCall> = self.tool_calls
             .into_iter()
             .map(|(_, tool_call)| tool_call)
@@ -68,6 +72,7 @@ impl StreamingAccumulator {
 
         AccumulatedResponse {
             text: self.text,
+            reasoning: self.reasoning,
             tool_calls,
         }
     }
