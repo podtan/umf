@@ -31,6 +31,9 @@ impl std::fmt::Display for MessageRole {
 pub struct ChatMLMessage {
     pub role: MessageRole,
     pub content: String,
+    /// Reasoning/thinking content (for thinking models like GLM, DeepSeek)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_content: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -50,6 +53,7 @@ impl ChatMLMessage {
         Self {
             role,
             content,
+            reasoning_content: None,
             name,
             tool_call_id: None,
             tool_calls: None,
@@ -66,6 +70,7 @@ impl ChatMLMessage {
         Self {
             role: MessageRole::Tool,
             content,
+            reasoning_content: None,
             name: Some(name),
             tool_call_id: Some(tool_call_id),
             tool_calls: None,
@@ -84,9 +89,26 @@ impl ChatMLMessage {
         Self {
             role: MessageRole::Assistant,
             content,
+            reasoning_content: None,
             name: None,
             tool_call_id: None,
             tool_calls: Some(tool_calls),
+        }
+    }
+
+    /// Initialize ChatML assistant message with reasoning.
+    ///
+    /// # Arguments
+    /// * `content` - Assistant message content.
+    /// * `reasoning_content` - Reasoning/thinking content.
+    pub fn new_assistant_with_reasoning(content: String, reasoning_content: String) -> Self {
+        Self {
+            role: MessageRole::Assistant,
+            content,
+            reasoning_content: Some(reasoning_content),
+            name: None,
+            tool_call_id: None,
+            tool_calls: None,
         }
     }
 
@@ -101,6 +123,13 @@ impl ChatMLMessage {
             "content".to_string(),
             serde_json::Value::String(self.content.clone()),
         );
+        // Include reasoning_content for thinking models
+        if let Some(ref reasoning) = self.reasoning_content {
+            message.insert(
+                "reasoning_content".to_string(),
+                serde_json::Value::String(reasoning.clone()),
+            );
+        }
 
         if let Some(name) = &self.name {
             message.insert("name".to_string(), serde_json::Value::String(name.clone()));
@@ -181,6 +210,24 @@ impl ChatMLFormatter {
     pub fn add_assistant_message(&mut self, content: String, name: Option<String>) -> &mut Self {
         self.messages
             .push(ChatMLMessage::new(MessageRole::Assistant, content, name));
+        self
+    }
+
+    /// Add assistant message with reasoning content (for thinking models).
+    ///
+    /// # Arguments
+    /// * `content` - Assistant message content.
+    /// * `reasoning_content` - Reasoning/thinking content from the model.
+    pub fn add_assistant_message_with_reasoning(
+        &mut self,
+        content: String,
+        reasoning_content: String,
+    ) -> &mut Self {
+        self.messages
+            .push(ChatMLMessage::new_assistant_with_reasoning(
+                content,
+                reasoning_content,
+            ));
         self
     }
 
