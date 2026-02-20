@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2026-02-20
+
+### Added
+- **Reasoning/Thinking Support**: Full support for thinking models (GLM, Qwen3, DeepSeek)
+  - `StreamChunk::Reasoning(String)`: New variant for reasoning content deltas
+  - `AccumulatedResponse::reasoning`: New field to store accumulated reasoning
+  - `ChatMLMessage::reasoning_content`: Optional field for reasoning content
+  - `ChatMLMessage::new_assistant_with_reasoning()`: Constructor for messages with reasoning
+  - `ChatMLFormatter::add_assistant_message_with_reasoning()`: Add assistant message with reasoning
+- `to_dict()` now includes `reasoning_content` field when present for API calls
+
+### Changed
+- `StreamingAccumulator` now handles `StreamChunk::Reasoning` chunks
+- Reasoning is accumulated separately from text content
+
+### Fixed
+- Thinking model responses now properly capture reasoning content
+- Reasoning is included in API requests back to thinking models
+
 ## [0.2.1] - 2026-02-17
 
 ### Changed
