@@ -218,16 +218,16 @@ impl ChatMLFormatter {
     /// # Arguments
     /// * `content` - Assistant message content.
     /// * `reasoning_content` - Reasoning/thinking content from the model.
+    /// * `tool_calls` - Optional tool calls to include with the message.
     pub fn add_assistant_message_with_reasoning(
         &mut self,
         content: String,
         reasoning_content: String,
+        tool_calls: Option<Vec<crate::ToolCall>>,
     ) -> &mut Self {
-        self.messages
-            .push(ChatMLMessage::new_assistant_with_reasoning(
-                content,
-                reasoning_content,
-            ));
+        let mut message = ChatMLMessage::new_assistant_with_reasoning(content, reasoning_content);
+        message.tool_calls = tool_calls;
+        self.messages.push(message);
         self
     }
 

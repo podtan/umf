@@ -427,14 +427,21 @@ pub struct Tool {
 /// Result of generation with tools
 #[derive(Debug)]
 pub enum GenerateResult {
-    /// Text-only response
-    Content(String),
-    /// Tool calls with optional preceding text content
+    /// Text-only response with optional reasoning
+    Content {
+        /// The response text
+        text: String,
+        /// Optional reasoning/thinking content (for thinking models)
+        reasoning: Option<String>,
+    },
+    /// Tool calls with optional preceding text content and reasoning
     ToolCalls {
         /// Tool calls to execute
         calls: Vec<ToolCall>,
         /// Optional text content that preceded the tool calls
         content: Option<String>,
+        /// Optional reasoning/thinking content (for thinking models)
+        reasoning: Option<String>,
     },
 }
 
