@@ -53,6 +53,11 @@ impl StreamingAccumulator {
                     tool_call.function.name = name_value;
                 }
                 if let Some(args_delta) = arguments_delta {
+                    // Debug logging for tool call argument accumulation
+                    if std::env::var("RUST_LOG").map(|v| v.to_lowercase().contains("debug")).unwrap_or(false) {
+                        eprintln!("[UMF ACCUMULATOR] Tool call {} args_delta: '{}'", index, args_delta);
+                        eprintln!("[UMF ACCUMULATOR] Tool call {} total args so far: '{}'", index, tool_call.function.arguments);
+                    }
                     // Accumulate arguments by appending
                     tool_call.function.arguments.push_str(&args_delta);
                 }
