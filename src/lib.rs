@@ -70,6 +70,7 @@ pub use mcp::{
 
 pub mod chatml;
 pub use chatml::{ChatMLFormatter, ChatMLMessage, MessageRole as ChatMLMessageRole};
+pub use chatml::count_tokens_for_text;
 
 // ============================================================================
 // Streaming Support (optional feature)

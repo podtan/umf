@@ -447,6 +447,20 @@ impl ChatMLFormatter {
     }
 }
 
+/// Count tokens for an arbitrary text string using cl100k_base.
+///
+/// Useful for measuring tool definition sizes, system prompts, or any
+/// text that isn't part of the conversation messages.
+///
+/// # Returns
+/// Number of tokens, or 0 if tokenization fails.
+pub fn count_tokens_for_text(text: &str) -> usize {
+    match cl100k_base() {
+        Ok(bpe) => bpe.encode_with_special_tokens(text).len(),
+        Err(_) => 0,
+    }
+}
+
 impl Default for ChatMLFormatter {
     fn default() -> Self {
         Self::new()
