@@ -159,9 +159,16 @@ impl ChatMLMessage {
             String::new()
         };
 
+        let reasoning_part = match &self.reasoning_content {
+            Some(reasoning) if !reasoning.is_empty() => {
+                format!("\n<think />\n{}\n</think />", reasoning)
+            }
+            _ => String::new(),
+        };
+
         format!(
-            "<|im_start|>{}{}\n{}\n<|im_end|>",
-            self.role, name_part, self.content
+            "<|im_start|>{}{}\n{}{}\n<|im_end|>",
+            self.role, name_part, reasoning_part, self.content
         )
     }
 }
