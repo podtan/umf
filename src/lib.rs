@@ -105,6 +105,14 @@ pub struct InternalMessage {
     pub role: MessageRole,
     /// Message content (text or structured blocks)
     pub content: MessageContent,
+    /// Optional reasoning/thinking content (assistant messages, thinking models)
+    ///
+    /// Preserved verbatim and sent as `reasoning_content` on OpenAI-compatible
+    /// requests. Keeping the exact string round-trips the rendered `<think>`
+    /// block byte-for-byte, which is required for LLM prefix-cache reuse
+    /// (the engine re-renders history; any divergence invalidates the prefix).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<String>,
     /// Optional metadata for provider-specific data
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub metadata: HashMap<String, String>,
@@ -122,6 +130,7 @@ impl InternalMessage {
         Self {
             role: MessageRole::System,
             content: MessageContent::Text(text.into()),
+            reasoning: None,
             metadata: HashMap::new(),
             tool_call_id: None,
             name: None,
@@ -133,6 +142,7 @@ impl InternalMessage {
         Self {
             role: MessageRole::User,
             content: MessageContent::Text(text.into()),
+            reasoning: None,
             metadata: HashMap::new(),
             tool_call_id: None,
             name: None,
@@ -144,6 +154,22 @@ impl InternalMessage {
         Self {
             role: MessageRole::Assistant,
             content: MessageContent::Text(text.into()),
+            reasoning: None,
+            metadata: HashMap::new(),
+            tool_call_id: None,
+            name: None,
+        }
+    }
+
+    /// Create an assistant message with preserved reasoning/thinking content.
+    pub fn assistant_with_reasoning(
+        text: impl Into<String>,
+        reasoning: impl Into<String>,
+    ) -> Self {
+        Self {
+            role: MessageRole::Assistant,
+            content: MessageContent::Text(text.into()),
+            reasoning: Some(reasoning.into()),
             metadata: HashMap::new(),
             tool_call_id: None,
             name: None,
@@ -155,6 +181,7 @@ impl InternalMessage {
         Self {
             role: MessageRole::Tool,
             content,
+            reasoning: None,
             metadata: HashMap::new(),
             tool_call_id: None,
             name: None,
@@ -170,6 +197,7 @@ impl InternalMessage {
         Self {
             role: MessageRole::Tool,
             content: MessageContent::Text(content.into()),
+            reasoning: None,
             metadata: HashMap::new(),
             tool_call_id: Some(tool_call_id.into()),
             name: Some(name.into()),
@@ -184,10 +212,22 @@ impl InternalMessage {
         Self {
             role: MessageRole::Assistant,
             content: MessageContent::Blocks(blocks),
+            reasoning: None,
             metadata: HashMap::new(),
             tool_call_id: None,
             name: None,
         }
+    }
+
+    /// Attach reasoning/thinking content (builder style) and return self.
+    pub fn with_reasoning(mut self, reasoning: impl Into<String>) -> Self {
+        self.reasoning = Some(reasoning.into());
+        self
+    }
+
+    /// Get reasoning/thinking content if present.
+    pub fn reasoning(&self) -> Option<&str> {
+        self.reasoning.as_deref()
     }
 
     /// Get text content if this is a text message
@@ -578,6 +618,7 @@ mod tests {
         let msg = InternalMessage {
             role: MessageRole::Assistant,
             content: MessageContent::Blocks(blocks),
+            reasoning: None,
             metadata: std::collections::HashMap::new(),
             tool_call_id: None,
             name: None,
@@ -612,6 +653,7 @@ mod tests {
         let msg = InternalMessage {
             role: MessageRole::Assistant,
             content: MessageContent::Blocks(blocks),
+            reasoning: None,
             metadata: std::collections::HashMap::new(),
             tool_call_id: None,
             name: None,

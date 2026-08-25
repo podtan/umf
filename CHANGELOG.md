@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.7] - 2026-08-25
+
+### Added
+
+- **`InternalMessage.reasoning` field** — assistant reasoning/thinking content is now a first-class field (serialized as `reasoning`, sent as `reasoning_content` on OpenAI-compatible requests). New constructors `InternalMessage::assistant_with_reasoning(..)` and builder `.with_reasoning(..)`; accessor `.reasoning()`. Preserving the exact string round-trips the engine-rendered `<think>` block byte-for-byte, which is required for LLM prefix-cache reuse across turns: the serving engine re-renders history with `<think>` blocks under `--preserve-thinking`, so dropping reasoning from prior assistant messages changes the rendered prompt and forces a full re-prefill (nghr 1494b6fe follow-up). Field is `Option<String>` with `#[serde(default)]` — fully backward compatible; existing serialized messages deserialize unchanged.
+
 ## [0.2.6] - 2026-04-22
 
 ### Fixed
