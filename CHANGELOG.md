@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-09-04
+
+### Added
+
+- **Multimodal image sidecar on `ChatMLMessage`** — new `images: Vec<ImageAttachment>` field (MIME type + base64 data + optional filename). `content` remains a plain `String`: every existing call site, checkpoint, and serialized transcript compiles and deserializes unchanged. The field carries `#[serde(default, skip_serializing_if = "Vec::is_empty")]`, so pre-0.3.0 JSON round-trips and text-only messages serialize compactly. New `ChatMLFormatter::add_user_message_with_images()` builds image-bearing user turns; `ImageAttachment::to_data_url()` renders the `data:{mime};base64,{data}` form used by OpenAI-compatible `image_url` content parts. `validate_messages()` now accepts empty-content user messages that carry images (image-only turns). Minor-version bump (not patch) because adding a public struct field breaks exhaustive struct-literal constructions downstream; wire serialization (OpenAI `image_url` parts) lives in the consumer (abk).
+
 ## [0.2.7] - 2026-08-25
 
 ### Added

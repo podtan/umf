@@ -26,6 +26,46 @@ impl std::fmt::Display for MessageRole {
     }
 }
 
+/// An image attached to a ChatML message (multimodal sidecar).
+///
+/// Stored out-of-band from `content` (which stays a plain `String`) so that
+/// every existing text-only call site, checkpoint, and serialized transcript
+/// keeps working unchanged. The field serializes only when non-empty and
+/// deserializes to an empty vec when absent, so old JSON is accepted as-is.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ImageAttachment {
+    /// MIME type of the image (e.g., "image/jpeg", "image/png").
+    pub mime: String,
+    /// Base64-encoded image data (no data-URL prefix).
+    pub data: String,
+    /// Original file name, when known (for display and error messages).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filename: Option<String>,
+}
+
+impl ImageAttachment {
+    /// Create an image attachment from a MIME type and base64 data.
+    pub fn new(mime: impl Into<String>, data: impl Into<String>) -> Self {
+        Self {
+            mime: mime.into(),
+            data: data.into(),
+            filename: None,
+        }
+    }
+
+    /// Attach an original filename (builder style).
+    pub fn with_filename(mut self, filename: impl Into<String>) -> Self {
+        self.filename = Some(filename.into());
+        self
+    }
+
+    /// Render as a data URL (`data:{mime};base64,{data}`), the form used by
+    /// OpenAI-compatible `image_url` content parts.
+    pub fn to_data_url(&self) -> String {
+        format!("data:{};base64,{}", self.mime, self.data)
+    }
+}
+
 /// Represents a single ChatML message.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMLMessage {
@@ -40,6 +80,10 @@ pub struct ChatMLMessage {
     pub tool_call_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<crate::ToolCall>>,
+    /// Attached images (multimodal sidecar). Empty for text-only messages;
+    /// absent in serialized form when empty so pre-0.3.0 JSON round-trips.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub images: Vec<ImageAttachment>,
 }
 
 impl ChatMLMessage {
@@ -57,6 +101,7 @@ impl ChatMLMessage {
             name,
             tool_call_id: None,
             tool_calls: None,
+            images: Vec::new(),
         }
     }
 
@@ -74,6 +119,7 @@ impl ChatMLMessage {
             name: Some(name),
             tool_call_id: Some(tool_call_id),
             tool_calls: None,
+            images: Vec::new(),
         }
     }
 
@@ -93,6 +139,7 @@ impl ChatMLMessage {
             name: None,
             tool_call_id: None,
             tool_calls: Some(tool_calls),
+            images: Vec::new(),
         }
     }
 
@@ -109,6 +156,7 @@ impl ChatMLMessage {
             name: None,
             tool_call_id: None,
             tool_calls: None,
+            images: Vec::new(),
         }
     }
 
@@ -206,6 +254,27 @@ impl ChatMLFormatter {
     pub fn add_user_message(&mut self, content: String, name: Option<String>) -> &mut Self {
         self.messages
             .push(ChatMLMessage::new(MessageRole::User, content, name));
+        self
+    }
+
+    /// Add user message with attached images (multimodal).
+    ///
+    /// Images ride on the `ChatMLMessage.images` sidecar; `content` stays a
+    /// plain string. Providers render them as content parts at wire time.
+    ///
+    /// # Arguments
+    /// * `content` - User message content (may be empty for image-only turns).
+    /// * `images` - Image attachments (MIME + base64 + optional filename).
+    /// * `name` - Optional name for the user.
+    pub fn add_user_message_with_images(
+        &mut self,
+        content: String,
+        images: Vec<ImageAttachment>,
+        name: Option<String>,
+    ) -> &mut Self {
+        let mut message = ChatMLMessage::new(MessageRole::User, content, name);
+        message.images = images;
+        self.messages.push(message);
         self
     }
 
@@ -413,7 +482,9 @@ impl ChatMLFormatter {
     pub fn validate_messages(&self) -> bool {
         for message in &self.messages {
             // Allow empty content for assistant messages with tool calls (OpenAI API requirement)
-            if message.content.is_empty() && message.tool_calls.is_none() {
+            // and for user messages that carry image attachments (image-only turns).
+            if message.content.is_empty() && message.tool_calls.is_none() && message.images.is_empty()
+            {
                 return false;
             }
             // System messages should have names for simpaticoder

@@ -143,3 +143,98 @@ fn test_broken_resume_behavior_validation() {
         "Old behavior should fail validation due to missing names"
     );
 }
+
+#[test]
+fn test_image_attachment_data_url() {
+    let img = ImageAttachment::new("image/jpeg", "QUJD").with_filename("photo.jpg");
+    assert_eq!(img.mime, "image/jpeg");
+    assert_eq!(img.data, "QUJD");
+    assert_eq!(img.filename.as_deref(), Some("photo.jpg"));
+    assert_eq!(img.to_data_url(), "data:image/jpeg;base64,QUJD");
+
+    // No filename → serializes without the key
+    let bare = ImageAttachment::new("image/png", "XYZ=");
+    let json = serde_json::to_value(&bare).unwrap();
+    assert!(json.get("filename").is_none());
+    assert_eq!(json["mime"], "image/png");
+}
+
+#[test]
+fn test_add_user_message_with_images() {
+    let mut formatter = ChatMLFormatter::new();
+    formatter.add_system_message("System".to_string(), Some("sys".to_string()));
+    let images = vec![
+        ImageAttachment::new("image/jpeg", "QUJD").with_filename("a.jpg"),
+        ImageAttachment::new("image/png", "WFla"),
+    ];
+    formatter.add_user_message_with_images(
+        "describe these".to_string(),
+        images,
+        None,
+    );
+
+    assert_eq!(formatter.get_message_count(), 2);
+    let last = formatter.get_last_message().unwrap();
+    assert_eq!(last.role, MessageRole::User);
+    assert_eq!(last.content, "describe these");
+    assert_eq!(last.images.len(), 2);
+    assert_eq!(last.images[0].mime, "image/jpeg");
+    assert_eq!(last.images[1].filename, None);
+
+    // Plain add_user_message still yields an empty sidecar
+    formatter.add_user_message("text only".to_string(), None);
+    assert!(formatter.get_last_message().unwrap().images.is_empty());
+}
+
+#[test]
+fn test_images_serde_roundtrip_and_backward_compat() {
+    // Round-trip: images serialize under the sidecar key and deserialize back.
+    let mut formatter = ChatMLFormatter::new();
+    formatter.add_user_message_with_images(
+        "look".to_string(),
+        vec![ImageAttachment::new("image/gif", "R0lGOD=")],
+        None,
+    );
+    let msg = &formatter.get_messages()[0];
+    let json = serde_json::to_value(msg).unwrap();
+    assert_eq!(json["images"][0]["mime"], "image/gif");
+    assert!(json["images"][0].get("filename").is_none());
+    let round: ChatMLMessage = serde_json::from_value(json).unwrap();
+    assert_eq!(round.role, msg.role);
+    assert_eq!(round.content, msg.content);
+    assert_eq!(round.images, msg.images);
+
+    // Backward compat: pre-0.3.0 JSON has no "images" key → deserializes to empty vec.
+    let legacy = serde_json::json!({
+        "role": "user",
+        "content": "old checkpoint message"
+    });
+    let old: ChatMLMessage = serde_json::from_value(legacy).unwrap();
+    assert_eq!(old.content, "old checkpoint message");
+    assert!(old.images.is_empty());
+
+    // Text-only messages omit the images key entirely (compact wire form).
+    let plain = ChatMLMessage::new(MessageRole::User, "hi".to_string(), None);
+    let plain_json = serde_json::to_value(&plain).unwrap();
+    assert!(plain_json.get("images").is_none());
+}
+
+#[test]
+fn test_validation_allows_image_only_user_message() {
+    let mut formatter = ChatMLFormatter::new();
+    formatter.add_system_message("System".to_string(), Some("sys".to_string()));
+    // Empty content but images present → valid (image-only turn).
+    formatter.add_user_message_with_images(
+        String::new(),
+        vec![ImageAttachment::new("image/webp", "UklGRg")],
+        None,
+    );
+    assert!(
+        formatter.validate_messages(),
+        "image-only user message should pass validation"
+    );
+
+    // Empty content, no images, no tool calls → still invalid.
+    formatter.add_user_message(String::new(), None);
+    assert!(!formatter.validate_messages());
+}
