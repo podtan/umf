@@ -238,3 +238,23 @@ fn test_validation_allows_image_only_user_message() {
     formatter.add_user_message(String::new(), None);
     assert!(!formatter.validate_messages());
 }
+
+#[test]
+fn test_get_messages_mut_sidecar_extension() {
+    let mut formatter = ChatMLFormatter::new();
+    formatter.add_user_message("task text".to_string(), None);
+
+    // Embedding layer extends the just-seeded user message in place.
+    let msgs = formatter.get_messages_mut();
+    msgs.last_mut()
+        .unwrap()
+        .images
+        .push(ImageAttachment::new("image/png", "iVBOR"));
+
+    assert_eq!(formatter.get_last_message().unwrap().images.len(), 1);
+    assert_eq!(
+        formatter.get_last_message().unwrap().images[0].mime,
+        "image/png"
+    );
+    assert_eq!(formatter.get_last_message().unwrap().content, "task text");
+}

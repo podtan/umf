@@ -425,6 +425,15 @@ impl ChatMLFormatter {
         &self.messages
     }
 
+    /// Get all messages mutably.
+    ///
+    /// Lets embedding layers extend the newest message's image sidecar in
+    /// place (e.g. attach files to the just-seeded task message) without
+    /// duplicating message-construction logic.
+    pub fn get_messages_mut(&mut self) -> &mut Vec<ChatMLMessage> {
+        &mut self.messages
+    }
+
     /// Format a thought and command in the expected format.
     ///
     /// # Arguments
